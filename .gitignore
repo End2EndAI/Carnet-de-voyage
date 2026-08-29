@@ -9,3 +9,4 @@ dist-ssr
 !.env.example
 npm-debug.log*
 yarn-error.log*
+.env*

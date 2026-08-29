@@ -5,6 +5,8 @@ import { hasSupabase } from './lib/supabase.js';
 import { hasMapsKey } from './lib/googleMaps.js';
 import GoogleMapView from './components/GoogleMapView.jsx';
 import PlaceSearch from './components/PlaceSearch.jsx';
+import Login from './components/Login.jsx';
+import { getSession, onAuthChange, signOut, cleanAuthHash } from './lib/auth.js';
 
 
 const VERDICTS = {
@@ -24,8 +26,42 @@ const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,
 
 const gmaps = (p) => `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
 
-// ---------- App ----------
+// ---------- Racine : porte d'entrée ----------
 export default function CoreeApp() {
+  const [session, setSession] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    getSession().then((s) => {
+      setSession(s);
+      setChecking(false);
+      cleanAuthHash();
+    });
+    return onAuthChange((s) => {
+      setSession(s);
+      cleanAuthHash();
+    });
+  }, []);
+
+  // Sans Supabase (variables absentes), on garde le carnet utilisable en local.
+  if (!hasSupabase) return <Carnet session={null} />;
+
+  if (checking) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center sans"
+        style={{ background: "var(--bg)", color: "var(--ink-soft)" }}>
+        <span className="text-xs tracking-[.2em] uppercase">Chargement…</span>
+      </div>
+    );
+  }
+
+  if (!session) return <Login />;
+
+  return <Carnet session={session} />;
+}
+
+// ---------- Carnet ----------
+function Carnet({ session }) {
   const [ideas, setIdeas] = useState(SEED.ideas);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState("");
@@ -103,28 +139,6 @@ export default function CoreeApp() {
 
   return (
     <div className="min-h-screen w-full" style={{ background: "var(--bg)", color: "var(--ink)" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=DM+Sans:opsz,wght@9..40,400..600&family=Noto+Serif+KR:wght@400;500;600&display=swap');
-        :root{--bg:#F2EDE3;--paper:#FAF6EE;--ink:#1B2230;--ink-soft:#5A6070;
-          --vermillion:#B5483D;--jade:#4A6B5C;--gold:#B89968;--gold-deep:#8C6F44;
-          --indigo:#47597E;--line:#D6CCB9;}
-        *{-webkit-font-smoothing:antialiased;box-sizing:border-box}
-        .sans{font-family:'DM Sans',system-ui,sans-serif}
-        .disp{font-family:'Fraunces',Georgia,serif;font-optical-sizing:auto;letter-spacing:-.01em}
-        .kr{font-family:'Noto Serif KR',serif}
-        .noscroll::-webkit-scrollbar{display:none}
-        .noscroll{-ms-overflow-style:none;scrollbar-width:none}
-        .fade{animation:f .35s ease-out}
-        @keyframes f{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-        .grain{background-image:radial-gradient(circle at 25% 15%,rgba(181,72,61,.05),transparent 40%),radial-gradient(circle at 80% 70%,rgba(74,107,92,.05),transparent 50%)}
-        input,textarea,select{font-family:'DM Sans',system-ui,sans-serif;width:100%;
-          background:var(--paper);border:1px solid var(--line);border-radius:6px;
-          padding:8px 10px;font-size:14px;color:var(--ink);outline:none}
-        input:focus,textarea:focus,select:focus{border-color:var(--gold)}
-        label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;
-          color:var(--ink-soft);font-weight:600;display:block;margin-bottom:5px}
-        .pin{cursor:pointer}
-      `}</style>
 
       <div className="max-w-2xl mx-auto grain sans">
         {/* Header */}
@@ -259,6 +273,14 @@ export default function CoreeApp() {
             style={{ color: "var(--ink-soft)" }}>
             Réinitialiser au carnet d'origine
           </button>
+          {session && (
+            <div className="mt-4 text-[10px]" style={{ color: "var(--ink-soft)" }}>
+              {session.user.email}
+              <button onClick={signOut} className="ml-2 underline tracking-[.2em] uppercase">
+                Se déconnecter
+              </button>
+            </div>
+          )}
         </footer>
       </div>
 

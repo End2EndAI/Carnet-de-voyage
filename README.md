@@ -32,14 +32,46 @@ localStorage et la vue carte affiche un message d'explication.
 
 ## Base de données
 
-Le schéma est dans [`supabase/schema.sql`](supabase/schema.sql) — à exécuter
-dans le SQL Editor du projet. Au premier chargement, si la table `ideas` est
-vide, l'application y verse automatiquement les 66 idées du carnet.
+Schéma dans [`supabase/schema.sql`](supabase/schema.sql), puis
+[`supabase/auth.sql`](supabase/auth.sql) pour la connexion — à exécuter dans
+cet ordre dans le SQL Editor du projet.
 
-> **Note de sécurité** — le carnet n'a pas de compte utilisateur : les règles RLS
-> donnent à la clé anon un accès complet à la table `ideas`. Toute personne
-> connaissant l'URL du site peut donc lire et modifier le carnet. Pour cloisonner,
-> il faut activer Supabase Auth (voir les commentaires dans `schema.sql`).
+## Accès
+
+Le carnet est privé : sans connexion, rien n'est visible. La connexion se fait
+par **lien magique** — pas de mot de passe, un lien à usage unique valable
+une heure envoyé par email.
+
+Seules les adresses présentes dans la table `allowed_emails` peuvent entrer.
+Deux verrous indépendants :
+
+1. `disable_signup` est actif côté Supabase et le client demande
+   `shouldCreateUser: false` — une adresse inconnue ne reçoit aucun email.
+2. Les politiques RLS de `ideas` exigent `authenticated` **et** une adresse
+   présente dans `allowed_emails`. Même avec un compte valide, une adresse
+   hors liste ne lit ni n'écrit rien.
+
+### Ajouter quelqu'un
+
+```sql
+insert into public.allowed_emails (email, note)
+values ('elle@exemple.com', 'Prénom');
+```
+
+Puis créer le compte : dashboard Supabase → *Authentication* → *Users* →
+*Add user* → cocher *Auto Confirm User*. Sans cette étape, la personne ne
+recevra pas de lien (les inscriptions sont désactivées).
+
+### Retirer quelqu'un
+
+Supprimer la ligne de `allowed_emails` coupe l'accès à la requête suivante.
+Pour invalider aussi sa session en cours, supprimer le compte dans
+*Authentication* → *Users*.
+
+> **Limite d'envoi** — le serveur mail intégré de Supabase est plafonné à
+> **2 emails par heure**, tous usages confondus. Suffisant à deux personnes qui
+> se connectent rarement (une session dure des semaines), mais si vous heurtez
+> la limite, configurez un SMTP externe dans *Authentication* → *Emails*.
 
 ## Lancer en local
 

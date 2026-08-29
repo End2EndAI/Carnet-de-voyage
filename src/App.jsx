@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { SEED } from './data.js';
 import { loadIdeas, saveIdea, removeIdea, resetToSeed } from './lib/store.js';
 import { hasSupabase } from './lib/supabase.js';
@@ -68,6 +68,7 @@ function Carnet({ session }) {
   const [city, setCity] = useState("seoul");
   const [view, setView] = useState("liste");
   const [editing, setEditing] = useState(null);
+  const [formSession, setFormSession] = useState(0); // force un remount propre de <Form> à chaque ouverture
   const [confirmDel, setConfirmDel] = useState(null);
   const [sel, setSel] = useState(null);
   const [filter, setFilter] = useState("tous");
@@ -218,7 +219,7 @@ function Carnet({ session }) {
               <option value="voir">À voir</option>
               <option value="non">Non</option>
             </select>
-            <button onClick={() => setEditing({ city, verdict: "voir" })}
+            <button onClick={() => { setFormSession(s => s + 1); setEditing({ city, verdict: "voir" }); }}
               className="ml-auto px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
               style={{ background: "var(--vermillion)", color: "var(--paper)", fontWeight: 600 }}>
               + Ajouter
@@ -272,7 +273,7 @@ function Carnet({ session }) {
               {listIdeas.map(i => (
                 <Card key={i.id} d={i} open={sel === i.id}
                   onToggle={() => setSel(sel === i.id ? null : i.id)}
-                  onEdit={() => setEditing(i)}
+                  onEdit={() => { setFormSession(s => s + 1); setEditing(i); }}
                   onDelete={() => setConfirmDel(i)} />
               ))}
             </div>
@@ -296,7 +297,7 @@ function Carnet({ session }) {
         </footer>
       </div>
 
-      {editing && <Form init={editing} cities={SEED.cities} onSave={save} onCancel={() => setEditing(null)} />}
+      {editing && <Form key={formSession} init={editing} cities={SEED.cities} onSave={save} onCancel={() => setEditing(null)} />}
       {confirmDel && (
         <Confirm item={confirmDel}
           onYes={() => confirmDel.id === "__reset__" ? resetAll() : remove(confirmDel.id)}
@@ -369,29 +370,37 @@ function Field({ label, children }) {
 
 // ---------- Formulaire ----------
 function Form({ init, cities, onSave, onCancel }) {
-  const [f, setF] = useState({
+  // Capturé une seule fois : "Réinitialiser" y revient (blanc pour une nouvelle idée,
+  // valeurs d'origine si on modifie une idée existante).
+  const initialState = useRef({
     title: "", kr: "", type: "", verdict: "voir", note: "",
     desc: "", zone: "", avis: "", when: "",
     ...init,
     lat: init.lat ?? "", lng: init.lng ?? "",
-  });
+  }).current;
+  const [f, setF] = useState(initialState);
   const [aiState, setAiState] = useState("idle"); // idle | loading | error
   const [aiError, setAiError] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const valid = f.title.trim().length > 0;
 
-  // Complète les champs vides à partir du nom (+ ville/quartier) via un modèle OpenAI.
-  // Ne touche jamais aux champs déjà remplis par l'utilisateur.
+  const resetFields = () => {
+    setF(initialState);
+    setAiState("idle");
+    setAiError(null);
+  };
+
+  // Complète les champs vides à partir du nom, de la latitude et de la longitude via un
+  // modèle OpenAI. Ne touche jamais aux champs déjà remplis par l'utilisateur.
   const generateWithAI = async () => {
     if (!f.title.trim() || aiState === "loading") return;
     setAiState("loading");
     setAiError(null);
     try {
-      const cityLabel = cities.find(c => c.id === f.city)?.label || f.city || "";
       const res = await fetch("/api/generate-idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: f.title, city: cityLabel, zone: f.zone, kr: f.kr }),
+        body: JSON.stringify({ title: f.title, lat: f.lat, lng: f.lng }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Échec de la génération.");
@@ -433,7 +442,7 @@ function Form({ init, cities, onSave, onCancel }) {
         <div className="p-5 space-y-3.5">
           <PlaceSearch onPick={(p) => setF(prev => ({
             ...prev,
-            title: prev.title.trim() ? prev.title : p.name,
+            title: p.name || prev.title,
             zone: prev.zone?.trim() ? prev.zone : (p.address || ""),
             lat: p.lat ?? prev.lat,
             lng: p.lng ?? prev.lng,
@@ -449,10 +458,15 @@ function Form({ init, cities, onSave, onCancel }) {
               }}>
               {aiState === "loading" ? "Génération…" : "Générer avec l'IA"}
             </button>
-            <span className="text-[10px]" style={{ color: "var(--ink-soft)" }}>
-              Complète les champs vides ci-dessous à partir du nom.
-            </span>
+            <button type="button" onClick={resetFields}
+              className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
+              style={{ border: "1px solid var(--line)", color: "var(--ink-soft)", fontWeight: 600 }}>
+              Réinitialiser les champs
+            </button>
           </div>
+          <span className="text-[10px] block -mt-1.5" style={{ color: "var(--ink-soft)" }}>
+            L'IA complète les champs vides ci-dessous à partir du nom, de la latitude et de la longitude.
+          </span>
           {aiState === "error" && aiError && (
             <p className="text-[11px]" style={{ color: "var(--vermillion)" }}>{aiError}</p>
           )}

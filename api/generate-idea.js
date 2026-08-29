@@ -65,9 +65,9 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
   const title = typeof body.title === 'string' ? body.title.trim() : '';
-  const city = typeof body.city === 'string' ? body.city.trim() : '';
-  const zone = typeof body.zone === 'string' ? body.zone.trim() : '';
-  const kr = typeof body.kr === 'string' ? body.kr.trim() : '';
+  const lat = Number(body.lat);
+  const lng = Number(body.lng);
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
   if (!title) {
     res.status(400).json({ error: "Le nom du lieu est requis pour générer une fiche." });
@@ -84,6 +84,8 @@ export default async function handler(req, res) {
           role: 'system',
           content:
             "Tu aides à pré-remplir une fiche d'un carnet de voyage personnel en Corée du Sud. " +
+            "Tu ne reçois que le nom du lieu et, si elles sont connues, sa latitude/longitude — " +
+            "déduis-en la ville et le quartier probables. " +
             'Réponds uniquement en français, de façon factuelle, concise et sobre. ' +
             "Si tu n'es pas certain d'un détail précis (adresse exacte, prix, horaires), reste " +
             "général plutôt que d'inventer. Le champ \"avis\" doit rester un brouillon neutre à " +
@@ -93,9 +95,8 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             `Lieu : ${title}`,
-            `Ville : ${city || 'non précisée'}`,
-            `Quartier déjà connu : ${zone || 'inconnu'}`,
-            `Nom coréen déjà connu : ${kr || 'inconnu'}`,
+            `Latitude : ${hasCoords ? lat : 'inconnue'}`,
+            `Longitude : ${hasCoords ? lng : 'inconnue'}`,
             '',
             'Propose les champs manquants de la fiche.',
           ].join('\n'),

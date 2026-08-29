@@ -24,6 +24,7 @@ function toRow(idea, position = 0) {
     lat: typeof idea.lat === 'number' && !Number.isNaN(idea.lat) ? idea.lat : null,
     lng: typeof idea.lng === 'number' && !Number.isNaN(idea.lng) ? idea.lng : null,
     origin: idea.origin || 'carnet',
+    favori: Boolean(idea.favori),
     position,
   };
 }
@@ -45,6 +46,7 @@ function fromRow(row) {
   if (row.when_note) idea.when = row.when_note;
   if (row.lat !== null && row.lat !== undefined) idea.lat = Number(row.lat);
   if (row.lng !== null && row.lng !== undefined) idea.lng = Number(row.lng);
+  if (row.favori) idea.favori = true;
   return idea;
 }
 

@@ -72,6 +72,7 @@ function Carnet({ session }) {
   const [confirmDel, setConfirmDel] = useState(null);
   const [sel, setSel] = useState(null);
   const [filter, setFilter] = useState("tous");
+  const [favOnly, setFavOnly] = useState(false);
   const [source, setSource] = useState(hasSupabase ? "supabase" : "local");
   const [errMsg, setErrMsg] = useState(null);
 
@@ -101,11 +102,16 @@ function Carnet({ session }) {
     }
   };
 
-  const cityIdeas = useMemo(() => {
+  const cityIdeasAll = useMemo(() => {
     let list = ideas.filter(i => i.city === city);
     if (filter !== "tous") list = list.filter(i => i.verdict === filter);
     return list;
   }, [ideas, city, filter]);
+  // Le bouton "Favoris" filtre toujours à l'intérieur de la ville sélectionnée.
+  const cityIdeas = useMemo(
+    () => (favOnly ? cityIdeasAll.filter(i => i.favori) : cityIdeasAll),
+    [cityIdeasAll, favOnly]
+  );
 
   const mapPts = useMemo(() => cityIdeas.filter(i => i.lat && i.lng), [cityIdeas]);
   // En vue carte, une sélection filtre la liste sur ce seul lieu.
@@ -128,6 +134,11 @@ function Carnet({ session }) {
     }
     persist(next, (list) => saveIdea(saved, list));
     setEditing(null);
+  };
+
+  const toggleFavori = (idea) => {
+    const next = ideas.map(i => i.id === idea.id ? { ...i, favori: !i.favori } : i);
+    persist(next, (list) => saveIdea({ ...idea, favori: !idea.favori }, list));
   };
 
   const remove = (id) => {
@@ -219,6 +230,11 @@ function Carnet({ session }) {
               <option value="voir">À voir</option>
               <option value="non">Non</option>
             </select>
+            <button onClick={() => setFavOnly(v => !v)}
+              className="px-3 py-1 rounded text-[11px] tracking-wide uppercase"
+              style={{ background: favOnly ? "var(--vermillion)" : "transparent", color: favOnly ? "var(--paper)" : "var(--ink-soft)", border: `1px solid ${favOnly ? "var(--vermillion)" : "var(--line)"}`, fontWeight: 600 }}>
+              ★ Favoris
+            </button>
             <button onClick={() => { setFormSession(s => s + 1); setEditing({ city, verdict: "voir" }); }}
               className="ml-auto px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
               style={{ background: "var(--vermillion)", color: "var(--paper)", fontWeight: 600 }}>
@@ -265,14 +281,21 @@ function Carnet({ session }) {
         <main className="px-6 pb-10 fade" key={city + view + filter + (view === "carte" ? sel || "" : "")}>
           {listIdeas.length === 0 ? (
             <div className="border border-dashed rounded-lg p-8 text-center" style={{ borderColor: "var(--line)" }}>
-              <div className="disp text-lg italic mb-1" style={{ color: "var(--ink-soft)" }}>Rien ici</div>
-              <div className="text-xs" style={{ color: "var(--ink-soft)" }}>Ajoutez une idée avec le bouton ci-dessus.</div>
+              <div className="disp text-lg italic mb-1" style={{ color: "var(--ink-soft)" }}>
+                {favOnly && cityIdeasAll.length > 0 ? "Aucun favori ici" : "Rien ici"}
+              </div>
+              <div className="text-xs" style={{ color: "var(--ink-soft)" }}>
+                {favOnly && cityIdeasAll.length > 0
+                  ? "Marquez une idée avec l'étoile pour la retrouver ici."
+                  : "Ajoutez une idée avec le bouton ci-dessus."}
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
               {listIdeas.map(i => (
                 <Card key={i.id} d={i} open={sel === i.id}
                   onToggle={() => setSel(sel === i.id ? null : i.id)}
+                  onToggleFav={() => toggleFavori(i)}
                   onEdit={() => { setFormSession(s => s + 1); setEditing(i); }}
                   onDelete={() => setConfirmDel(i)} />
               ))}
@@ -308,26 +331,34 @@ function Carnet({ session }) {
 }
 
 // ---------- Fiche ----------
-function Card({ d, open, onToggle, onEdit, onDelete }) {
+function Card({ d, open, onToggle, onToggleFav, onEdit, onDelete }) {
   const v = VERDICTS[d.verdict] || VERDICTS.voir;
   return (
     <article className="rounded-lg overflow-hidden" style={{ background: "var(--paper)", border: "1px solid var(--line)" }}>
-      <button onClick={onToggle} className="w-full text-left p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h3 className="disp text-[1.2rem] leading-tight" style={{ fontWeight: 600 }}>{d.title}</h3>
-            {d.kr && <div className="kr text-xs mt-0.5" style={{ color: "var(--ink-soft)" }}>{d.kr}</div>}
-            {d.type && <div className="text-[9px] tracking-[.2em] uppercase mt-1.5" style={{ color: "var(--gold-deep)", fontWeight: 600 }}>{d.type}</div>}
+      <div className="flex items-start gap-1 pl-4 pr-2.5 pt-4">
+        <button onClick={onToggle} className="flex-1 min-w-0 text-left pb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="disp text-[1.2rem] leading-tight" style={{ fontWeight: 600 }}>{d.title}</h3>
+              {d.kr && <div className="kr text-xs mt-0.5" style={{ color: "var(--ink-soft)" }}>{d.kr}</div>}
+              {d.type && <div className="text-[9px] tracking-[.2em] uppercase mt-1.5" style={{ color: "var(--gold-deep)", fontWeight: 600 }}>{d.type}</div>}
+            </div>
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+              <span className="text-[9px] tracking-[.15em] px-2 py-0.5 rounded-full"
+                style={{ background: v.bg, color: v.color, fontWeight: 700 }}>{v.label}</span>
+              {d.origin === "perso" && (
+                <span className="text-[8px] tracking-wider uppercase" style={{ color: "var(--indigo)", fontWeight: 700 }}>perso</span>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-            <span className="text-[9px] tracking-[.15em] px-2 py-0.5 rounded-full"
-              style={{ background: v.bg, color: v.color, fontWeight: 700 }}>{v.label}</span>
-            {d.origin === "perso" && (
-              <span className="text-[8px] tracking-wider uppercase" style={{ color: "var(--indigo)", fontWeight: 700 }}>perso</span>
-            )}
-          </div>
-        </div>
-      </button>
+        </button>
+        <button type="button" onClick={onToggleFav}
+          aria-label={d.favori ? "Retirer des favoris" : "Ajouter aux favoris"}
+          className="flex-shrink-0 w-8 h-8 flex items-center justify-center"
+          style={{ color: d.favori ? "var(--vermillion)" : "var(--line)", fontSize: 20, lineHeight: 1 }}>
+          {d.favori ? "★" : "☆"}
+        </button>
+      </div>
 
       {open && (
         <div className="px-4 pb-4 fade" style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>

@@ -58,5 +58,6 @@ create policy "ideas_delete" on public.ideas
 -- Une adresse retirée perd l'accès dès sa requête suivante, mais sa session
 -- reste techniquement valide : révoquez-la aussi dans Authentication > Users.
 insert into public.allowed_emails (email, note) values
-  ('REMPLACER@exemple.com', 'Louis')
+  ('REMPLACER@exemple.com', 'Louis'),
+  ('jade.albrand@gmail.com', 'Jade')
 on conflict (email) do nothing;

@@ -17,9 +17,14 @@ create table if not exists public.ideas (
   lat         double precision,
   lng         double precision,
   origin      text not null default 'carnet',
+  favori      boolean not null default false,
   position    integer not null default 0,
   updated_at  timestamptz not null default now()
 );
+
+-- Pour une base déjà créée avant l'ajout des favoris : sans effet sur une
+-- installation neuve, où la colonne existe déjà via le create table ci-dessus.
+alter table public.ideas add column if not exists favori boolean not null default false;
 
 create index if not exists ideas_city_idx on public.ideas (city);
 create index if not exists ideas_position_idx on public.ideas (position);

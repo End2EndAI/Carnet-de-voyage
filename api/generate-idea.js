@@ -6,6 +6,13 @@
 // VITE_ : une variable VITE_* est embarquée dans le bundle JS envoyé au
 // navigateur, ce qui exposerait la clé à n'importe qui. Ici, seul ce code
 // serveur y a accès.
+//
+// Déroulé en deux appels :
+//  1. Recherche web libre (outil `web_search`) pour vérifier ce qui existe
+//     vraiment sur ce lieu — pas de format contraint ici, la compatibilité
+//     entre `web_search` et un JSON schema strict n'étant pas garantie.
+//  2. Mise en forme du résultat (avec ou sans notes de recherche, si l'étape 1
+//     a échoué ou n'a rien trouvé) dans le JSON schema attendu par le formulaire.
 
 import OpenAI from 'openai';
 
@@ -33,7 +40,9 @@ const FIELDS_SCHEMA = {
     },
     zone: {
       type: 'string',
-      description: 'Quartier ou zone probable où se trouve le lieu, si déductible du nom ou de la ville.',
+      description:
+        'Quartier ou zone où se trouve le lieu. Reprends tel quel le quartier fourni ' +
+        "(venant de Google Maps) s'il existe ; sinon déduis-le du nom du lieu ou des coordonnées.",
     },
     avis: {
       type: 'string',
@@ -48,6 +57,44 @@ const FIELDS_SCHEMA = {
   required: ['kr', 'type', 'note', 'desc', 'zone', 'avis', 'when'],
   additionalProperties: false,
 };
+
+// Étape 1 — recherche web libre. Best-effort : si l'outil n'est pas dispo pour ce
+// compte/modèle, ou si la recherche échoue, on continue sans plutôt que de tout faire échouer.
+async function researchPlace(client, title, lat, lng, hasCoords, zone) {
+  try {
+    const response = await client.responses.create({
+      model: MODEL,
+      tools: [{ type: 'web_search' }],
+      input: [
+        {
+          role: 'system',
+          content:
+            "Tu recherches des informations fiables sur un lieu, en vue d'aider à pré-remplir " +
+            "la fiche d'un carnet de voyage personnel en Corée du Sud. Le quartier fourni vient " +
+            "de Google Maps et est fiable : utilise-le pour situer le lieu sans le remettre en " +
+            'question. Utilise la recherche web pour vérifier le nom coréen exact, le type de ' +
+            "lieu, ce que les visiteurs en disent en général, et le meilleur moment pour le " +
+            "visiter. Réponds en français, en quelques phrases factuelles. Si tu ne trouves rien " +
+            "de fiable ou d'assez précis sur ce lieu précis, dis-le clairement plutôt que " +
+            "d'inventer des détails.",
+        },
+        {
+          role: 'user',
+          content: [
+            `Lieu à rechercher : ${title}`,
+            `Quartier (Google Maps) : ${zone || 'inconnu'}`,
+            `Latitude : ${hasCoords ? lat : 'inconnue'}`,
+            `Longitude : ${hasCoords ? lng : 'inconnue'}`,
+          ].join('\n'),
+        },
+      ],
+    });
+    return response.output_text || null;
+  } catch (err) {
+    console.error('web_search indisponible pour cette génération, on continue sans :', err?.message);
+    return null;
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -65,6 +112,7 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
   const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const zone = typeof body.zone === 'string' ? body.zone.trim() : '';
   const lat = Number(body.lat);
   const lng = Number(body.lng);
   const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
@@ -77,6 +125,8 @@ export default async function handler(req, res) {
   try {
     const client = new OpenAI({ apiKey });
 
+    const research = await researchPlace(client, title, lat, lng, hasCoords, zone);
+
     const response = await client.responses.create({
       model: MODEL,
       input: [
@@ -84,19 +134,26 @@ export default async function handler(req, res) {
           role: 'system',
           content:
             "Tu aides à pré-remplir une fiche d'un carnet de voyage personnel en Corée du Sud. " +
-            "Tu ne reçois que le nom du lieu et, si elles sont connues, sa latitude/longitude — " +
-            "déduis-en la ville et le quartier probables. " +
-            'Réponds uniquement en français, de façon factuelle, concise et sobre. ' +
-            "Si tu n'es pas certain d'un détail précis (adresse exacte, prix, horaires), reste " +
-            "général plutôt que d'inventer. Le champ \"avis\" doit rester un brouillon neutre à " +
-            "corriger par l'utilisateur, jamais formulé comme une expérience vécue.",
+            "Le quartier, quand il est fourni, vient de Google Maps et est fiable : ne le " +
+            "remets pas en question, sers-t'en pour situer le lieu et enrichir les autres " +
+            "champs (type, descriptif, avis). Des notes de recherche web peuvent aussi t'être " +
+            "fournies : si elles sont présentes et pertinentes, base-toi dessus en priorité. Si " +
+            "tout ça est absent ou peu concluant, déduis ce que tu peux du nom du lieu et de sa " +
+            "latitude/longitude, sinon reste général plutôt que d'inventer. Réponds uniquement " +
+            "en français, de façon factuelle, concise et sobre. Le champ \"avis\" doit rester un " +
+            "brouillon neutre à corriger par l'utilisateur, jamais formulé comme une expérience vécue.",
         },
         {
           role: 'user',
           content: [
             `Lieu : ${title}`,
+            `Quartier (Google Maps) : ${zone || 'inconnu'}`,
             `Latitude : ${hasCoords ? lat : 'inconnue'}`,
             `Longitude : ${hasCoords ? lng : 'inconnue'}`,
+            '',
+            research
+              ? `Notes de recherche web :\n${research}`
+              : "(Aucune recherche web exploitable — reste général plutôt que d'inventer.)",
             '',
             'Propose les champs manquants de la fiche.',
           ].join('\n'),
@@ -119,7 +176,7 @@ export default async function handler(req, res) {
     }
 
     const fields = JSON.parse(raw);
-    res.status(200).json({ fields });
+    res.status(200).json({ fields, researched: Boolean(research) });
   } catch (err) {
     const message = err?.message || "Échec de l'appel à OpenAI.";
     res.status(502).json({ error: message });

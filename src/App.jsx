@@ -381,6 +381,7 @@ function Form({ init, cities, onSave, onCancel }) {
   const [f, setF] = useState(initialState);
   const [aiState, setAiState] = useState("idle"); // idle | loading | error
   const [aiError, setAiError] = useState(null);
+  const [aiResearched, setAiResearched] = useState(null); // null tant qu'aucune génération n'a eu lieu
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const valid = f.title.trim().length > 0;
 
@@ -388,10 +389,12 @@ function Form({ init, cities, onSave, onCancel }) {
     setF(initialState);
     setAiState("idle");
     setAiError(null);
+    setAiResearched(null);
   };
 
   // Complète les champs vides à partir du nom, de la latitude et de la longitude via un
-  // modèle OpenAI. Ne touche jamais aux champs déjà remplis par l'utilisateur.
+  // modèle OpenAI (qui fait au préalable une recherche web pour vérifier ses infos).
+  // Ne touche jamais aux champs déjà remplis par l'utilisateur.
   const generateWithAI = async () => {
     if (!f.title.trim() || aiState === "loading") return;
     setAiState("loading");
@@ -400,7 +403,7 @@ function Form({ init, cities, onSave, onCancel }) {
       const res = await fetch("/api/generate-idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: f.title, lat: f.lat, lng: f.lng }),
+        body: JSON.stringify({ title: f.title, lat: f.lat, lng: f.lng, zone: f.zone }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Échec de la génération.");
@@ -411,6 +414,7 @@ function Form({ init, cities, onSave, onCancel }) {
         }
         return next;
       });
+      setAiResearched(Boolean(data.researched));
       setAiState("idle");
     } catch (e) {
       setAiState("error");
@@ -443,7 +447,7 @@ function Form({ init, cities, onSave, onCancel }) {
           <PlaceSearch onPick={(p) => setF(prev => ({
             ...prev,
             title: p.name || prev.title,
-            zone: prev.zone?.trim() ? prev.zone : (p.address || ""),
+            zone: p.address || prev.zone,
             lat: p.lat ?? prev.lat,
             lng: p.lng ?? prev.lng,
           }))} />
@@ -465,10 +469,18 @@ function Form({ init, cities, onSave, onCancel }) {
             </button>
           </div>
           <span className="text-[10px] block -mt-1.5" style={{ color: "var(--ink-soft)" }}>
-            L'IA complète les champs vides ci-dessous à partir du nom, de la latitude et de la longitude.
+            L'IA cherche sur le web puis complète les champs vides ci-dessous à partir du nom,
+            de la latitude et de la longitude.
           </span>
           {aiState === "error" && aiError && (
             <p className="text-[11px]" style={{ color: "var(--vermillion)" }}>{aiError}</p>
+          )}
+          {aiState === "idle" && aiResearched !== null && (
+            <p className="text-[10px]" style={{ color: aiResearched ? "var(--jade)" : "var(--gold-deep)" }}>
+              {aiResearched
+                ? "Champs proposés à partir d'une recherche web — à relire quand même."
+                : "Recherche web indisponible cette fois : champs génériques, à vérifier."}
+            </p>
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>

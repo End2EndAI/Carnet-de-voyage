@@ -375,8 +375,39 @@ function Form({ init, cities, onSave, onCancel }) {
     ...init,
     lat: init.lat ?? "", lng: init.lng ?? "",
   });
+  const [aiState, setAiState] = useState("idle"); // idle | loading | error
+  const [aiError, setAiError] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const valid = f.title.trim().length > 0;
+
+  // Complète les champs vides à partir du nom (+ ville/quartier) via un modèle OpenAI.
+  // Ne touche jamais aux champs déjà remplis par l'utilisateur.
+  const generateWithAI = async () => {
+    if (!f.title.trim() || aiState === "loading") return;
+    setAiState("loading");
+    setAiError(null);
+    try {
+      const cityLabel = cities.find(c => c.id === f.city)?.label || f.city || "";
+      const res = await fetch("/api/generate-idea", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: f.title, city: cityLabel, zone: f.zone, kr: f.kr }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Échec de la génération.");
+      setF(prev => {
+        const next = { ...prev };
+        for (const key of ["kr", "type", "note", "desc", "zone", "avis", "when"]) {
+          if (!String(prev[key] || "").trim() && data.fields?.[key]) next[key] = data.fields[key];
+        }
+        return next;
+      });
+      setAiState("idle");
+    } catch (e) {
+      setAiState("error");
+      setAiError(e.message || "Échec de la génération.");
+    }
+  };
 
   const submit = () => {
     if (!valid) return;
@@ -408,6 +439,23 @@ function Form({ init, cities, onSave, onCancel }) {
             lng: p.lng ?? prev.lng,
           }))} />
           <div><label>Nom *</label><input value={f.title} onChange={set("title")} placeholder="Ex : Café Onion Seongsu" /></div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button type="button" onClick={generateWithAI} disabled={!f.title.trim() || aiState === "loading"}
+              className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
+              style={{
+                border: "1px solid var(--indigo)", color: "var(--indigo)", fontWeight: 600,
+                opacity: (!f.title.trim() || aiState === "loading") ? 0.5 : 1,
+                cursor: (!f.title.trim() || aiState === "loading") ? "not-allowed" : "pointer",
+              }}>
+              {aiState === "loading" ? "Génération…" : "Générer avec l'IA"}
+            </button>
+            <span className="text-[10px]" style={{ color: "var(--ink-soft)" }}>
+              Complète les champs vides ci-dessous à partir du nom.
+            </span>
+          </div>
+          {aiState === "error" && aiError && (
+            <p className="text-[11px]" style={{ color: "var(--vermillion)" }}>{aiError}</p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label>Ville</label>

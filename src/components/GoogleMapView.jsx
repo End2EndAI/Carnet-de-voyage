@@ -25,10 +25,28 @@ function makePin(index, color, selected) {
   return el;
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function infoWindowContent(title, kr) {
+  return `
+    <div style="font-family:'DM Sans',system-ui,sans-serif;padding:2px 2px;max-width:220px;">
+      <div style="font-size:13px;font-weight:700;color:#1B2230;line-height:1.3;">${escapeHtml(title)}</div>
+      ${kr ? `<div style="font-size:11px;color:#6b6b6b;margin-top:2px;">${escapeHtml(kr)}</div>` : ''}
+    </div>
+  `;
+}
+
 export default function GoogleMapView({ pts, sel, onSel }) {
   const holder = useRef(null);
   const map = useRef(null);
   const markers = useRef(new Map());
+  const infoWindow = useRef(null);
   const [error, setError] = useState(null);
   const [ready, setReady] = useState(false);
 
@@ -59,8 +77,14 @@ export default function GoogleMapView({ pts, sel, onSel }) {
       });
     }
 
-    markers.current.forEach((m) => {
-      m.map = null;
+    if (!infoWindow.current) {
+      infoWindow.current = new maps.InfoWindow();
+      // Si l'utilisateur ferme l'infobulle à la main, on désélectionne le point.
+      infoWindow.current.addListener('closeclick', () => onSel(null));
+    }
+
+    markers.current.forEach(({ marker }) => {
+      marker.map = null;
     });
     markers.current = new Map();
 
@@ -78,7 +102,7 @@ export default function GoogleMapView({ pts, sel, onSel }) {
         zIndex: sel === p.id ? 999 : i,
       });
       marker.addListener('gmp-click', () => onSel(sel === p.id ? null : p.id));
-      markers.current.set(p.id, { marker, index: i, city: p.city });
+      markers.current.set(p.id, { marker, index: i, city: p.city, title: p.title, kr: p.kr });
       bounds.extend(position);
     });
 
@@ -93,7 +117,7 @@ export default function GoogleMapView({ pts, sel, onSel }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, pts]);
 
-  // Mise en évidence du marqueur sélectionné
+  // Mise en évidence du marqueur sélectionné + infobulle avec le nom du lieu
   useEffect(() => {
     if (!ready) return;
     markers.current.forEach(({ marker, index, city }, id) => {
@@ -101,6 +125,14 @@ export default function GoogleMapView({ pts, sel, onSel }) {
       marker.content = makePin(index, CITY_HEX[city] || '#1B2230', selected);
       marker.zIndex = selected ? 999 : index;
     });
+
+    const entry = sel ? markers.current.get(sel) : null;
+    if (entry && infoWindow.current) {
+      infoWindow.current.setContent(infoWindowContent(entry.title, entry.kr));
+      infoWindow.current.open({ map: map.current, anchor: entry.marker });
+    } else {
+      infoWindow.current?.close();
+    }
   }, [sel, ready]);
 
   if (!hasMapsKey || error) {

@@ -107,6 +107,11 @@ function Carnet({ session }) {
   }, [ideas, city, filter]);
 
   const mapPts = useMemo(() => cityIdeas.filter(i => i.lat && i.lng), [cityIdeas]);
+  // En vue carte, une sélection filtre la liste sur ce seul lieu.
+  const listIdeas = useMemo(
+    () => (view === "carte" && sel ? cityIdeas.filter(i => i.id === sel) : cityIdeas),
+    [cityIdeas, view, sel]
+  );
   const countFor = (id) => ideas.filter(i => i.city === id).length;
 
   const save = (data) => {
@@ -240,8 +245,15 @@ function Carnet({ session }) {
             ) : (
               <>
                 <GoogleMapView pts={mapPts} sel={sel} onSel={setSel} />
-                <div className="text-[10px] mt-2 px-1" style={{ color: "var(--ink-soft)" }}>
-                  {mapPts.length}/{cityIdeas.length} lieux placés. Touchez un point pour l'ouvrir dans la liste.
+                <div className="text-[10px] mt-2 px-1 flex items-center gap-1.5 flex-wrap" style={{ color: "var(--ink-soft)" }}>
+                  <span>{mapPts.length}/{cityIdeas.length} lieux placés.</span>
+                  {sel ? (
+                    <button onClick={() => setSel(null)} className="underline" style={{ color: "var(--vermillion)", fontWeight: 600 }}>
+                      Voir les {cityIdeas.length} idées
+                    </button>
+                  ) : (
+                    <span>Touchez un point pour n'afficher que ce lieu ci-dessous.</span>
+                  )}
                 </div>
               </>
             )}
@@ -249,15 +261,15 @@ function Carnet({ session }) {
         )}
 
         {/* Liste */}
-        <main className="px-6 pb-10 fade" key={city + view + filter}>
-          {cityIdeas.length === 0 ? (
+        <main className="px-6 pb-10 fade" key={city + view + filter + (view === "carte" ? sel || "" : "")}>
+          {listIdeas.length === 0 ? (
             <div className="border border-dashed rounded-lg p-8 text-center" style={{ borderColor: "var(--line)" }}>
               <div className="disp text-lg italic mb-1" style={{ color: "var(--ink-soft)" }}>Rien ici</div>
               <div className="text-xs" style={{ color: "var(--ink-soft)" }}>Ajoutez une idée avec le bouton ci-dessus.</div>
             </div>
           ) : (
             <div className="space-y-3">
-              {cityIdeas.map(i => (
+              {listIdeas.map(i => (
                 <Card key={i.id} d={i} open={sel === i.id}
                   onToggle={() => setSel(sel === i.id ? null : i.id)}
                   onEdit={() => setEditing(i)}

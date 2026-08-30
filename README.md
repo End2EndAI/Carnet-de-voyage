@@ -1,17 +1,20 @@
-# Carnet de voyage — Corée du Sud
+# Carnet de voyage
 
-Carnet de voyage éditable pour un séjour en Corée du Sud du **24 septembre au 10 octobre 2026**.
-66 idées de visites préchargées, réparties sur Séoul, Jeju, Busan, Gyeongju et Jeonju.
+Application de préparation de voyage multi-comptes. Chacun crée son compte,
+ses voyages, et ne voit que les siens.
 
 ## Fonctionnalités
 
+- **Inscription et connexion** par email + mot de passe
+- **Plusieurs voyages par compte**, chacun avec ses étapes
+- **Création guidée** : cinq questions (destination, dates, étapes, centres
+  d'intérêt, rythme) et le carnet se pré-remplit avec des lieux suggérés
 - **Ajouter / modifier / supprimer** des idées de visite
-- **Persistance Supabase** — le carnet est le même sur téléphone et ordinateur
 - **Vraie carte Google Maps** avec un marqueur par lieu, cliquable
 - **Recherche d'adresse** (Google Places) : le nom et les coordonnées se remplissent seuls
-- **Filtre par verdict** (oui / option / à voir / non) et navigation par ville
-- **Mode dégradé** : si Supabase est injoignable, l'app continue en localStorage
-- **Réinitialisation** possible vers les 66 idées d'origine
+- **Complétion d'une fiche par IA** à partir du seul nom du lieu
+- **Filtre par verdict** (oui / option / à voir / non), favoris, navigation par étape
+- **Données cloisonnées** par compte au niveau de la base (Row Level Security)
 
 ## Variables d'environnement
 
@@ -21,57 +24,62 @@ Carnet de voyage éditable pour un séjour en Corée du Sud du **24 septembre au
 | `VITE_SUPABASE_ANON_KEY` | Clé publique | Supabase → Project Settings → API |
 | `VITE_GOOGLE_MAPS_API_KEY` | Carte + recherche | Google Cloud → APIs & Services → Credentials |
 | `VITE_GOOGLE_MAPS_MAP_ID` | *(facultatif)* style de carte | Google Cloud → Map Management |
+| `OPENAI_API_KEY` | Génération des carnets et des fiches | platform.openai.com |
 
 APIs Google à activer : **Maps JavaScript API** et **Places API (New)**.
 
-Ces variables sont lues au moment du build. Après les avoir modifiées sur Vercel,
-il faut relancer un déploiement pour qu'elles prennent effet.
+`OPENAI_API_KEY` est volontairement **sans** préfixe `VITE_` : une variable
+`VITE_*` est embarquée dans le bundle envoyé au navigateur. Seules les
+fonctions serverless (`api/`) y ont accès.
 
-Sans elles, l'application démarre quand même : la persistance retombe sur
-localStorage et la vue carte affiche un message d'explication.
+Les variables `VITE_*` sont lues au moment du build. Après les avoir modifiées
+sur Vercel, il faut relancer un déploiement.
 
-## Base de données
+Sans `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, l'application affiche un
+écran d'explication : il n'y a ni comptes ni carnets sans base.
 
-Schéma dans [`supabase/schema.sql`](supabase/schema.sql), puis
-[`supabase/auth.sql`](supabase/auth.sql) pour la connexion — à exécuter dans
-cet ordre dans le SQL Editor du projet.
+## Mise en place du projet Supabase
 
-## Accès
+### 1. Le schéma
 
-Le carnet est privé : sans connexion, rien n'est visible. La connexion se fait
-par **lien magique** — pas de mot de passe, un lien à usage unique valable
-une heure envoyé par email.
+Exécuter [`supabase/schema.sql`](supabase/schema.sql) dans le SQL Editor du
+projet. Le fichier est idempotent et peut être rejoué.
 
-Seules les adresses présentes dans la table `allowed_emails` peuvent entrer.
-Deux verrous indépendants :
+Il crée `trips` et `ideas`, active la Row Level Security sur les deux, et
+supprime l'ancien accès par liste blanche (`allowed_emails`). Les données de
+l'ancienne version mono-carnet ne sont pas perdues : la table est renommée
+`ideas_legacy` et son contenu repris dans un voyage rattaché au plus ancien
+compte de la base. Une fois la reprise vérifiée, `ideas_legacy` peut être
+supprimée à la main.
 
-1. `disable_signup` est actif côté Supabase et le client demande
-   `shouldCreateUser: false` — une adresse inconnue ne reçoit aucun email.
-2. Les politiques RLS de `ideas` exigent `authenticated` **et** une adresse
-   présente dans `allowed_emails`. Même avec un compte valide, une adresse
-   hors liste ne lit ni n'écrit rien.
+> Si la base ne contient encore aucun compte au moment de l'exécution, la
+> reprise est ignorée avec un message. Rejouer le fichier après la première
+> inscription.
 
-### Ajouter quelqu'un
+### 2. L'authentification
 
-```sql
-insert into public.allowed_emails (email, note)
-values ('elle@exemple.com', 'Prénom');
-```
+Dans *Authentication* → *Sign In / Providers* → *Email* :
 
-Puis créer le compte : dashboard Supabase → *Authentication* → *Users* →
-*Add user* → cocher *Auto Confirm User*. Sans cette étape, la personne ne
-recevra pas de lien (les inscriptions sont désactivées).
+- **Allow new users to sign up** : activé, sinon personne ne peut s'inscrire.
+- **Confirm email** : désactivé. Le serveur mail intégré de Supabase est
+  plafonné à **2 emails par heure**, tous usages confondus — avec la
+  confirmation active, la troisième inscription de l'heure échoue. Pour la
+  garder active, configurez d'abord un SMTP externe dans *Authentication* →
+  *Emails*. Le code gère les deux cas : sans session en retour, l'écran invite
+  à ouvrir le lien de confirmation.
 
-### Retirer quelqu'un
+Dans *Authentication* → *URL Configuration*, la *Site URL* et l'*allow list*
+doivent couvrir l'URL de production et `http://localhost:5173/**`.
 
-Supprimer la ligne de `allowed_emails` coupe l'accès à la requête suivante.
-Pour invalider aussi sa session en cours, supprimer le compte dans
-*Authentication* → *Users*.
+## Cloisonnement des données
 
-> **Limite d'envoi** — le serveur mail intégré de Supabase est plafonné à
-> **2 emails par heure**, tous usages confondus. Suffisant à deux personnes qui
-> se connectent rarement (une session dure des semaines), mais si vous heurtez
-> la limite, configurez un SMTP externe dans *Authentication* → *Emails*.
+`trips.user_id` et `ideas.user_id` ont `auth.uid()` pour valeur par défaut :
+le client n'envoie jamais l'identifiant du propriétaire. Les politiques RLS
+n'autorisent que `user_id = auth.uid()`, en lecture comme en écriture, et sont
+limitées au rôle `authenticated` — sans session, les tables sont invisibles.
+
+Un compte ne peut donc ni lire, ni modifier, ni s'attribuer les données d'un
+autre, même en manipulant les requêtes depuis le navigateur.
 
 ## Lancer en local
 
@@ -82,6 +90,11 @@ npm run dev
 ```
 
 Le site est accessible sur `http://localhost:5173`.
+
+Les fonctions `api/` ne tournent pas avec `npm run dev` : utilisez `vercel dev`
+pour tester la génération de carnet et la complétion de fiche en local. Sans
+elles, la création d'un voyage fonctionne quand même — le carnet est
+simplement créé vide, avec un message.
 
 ## Déploiement
 

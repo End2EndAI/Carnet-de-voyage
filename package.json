@@ -1,9 +1,9 @@
 {
-  "name": "coree-carnet",
+  "name": "carnet-de-voyage",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Carnet de voyage éditable — Corée du Sud, septembre-octobre 2026",
+  "description": "Carnets de voyage multi-comptes : étapes, idées de visite, verdicts et carte.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

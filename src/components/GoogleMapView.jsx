@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps, hasMapsKey, MAP_ID } from '../lib/googleMaps.js';
 
-const CITY_HEX = {
-  seoul: '#1B2230',
-  jeju: '#B5483D',
-  busan: '#4A6B5C',
-  gyeongju: '#8C6F44',
-  jeonju: '#47597E',
-};
+// Une couleur par étape, tirée de la palette du carnet. L'identifiant de
+// l'étape choisit la teinte : même étape, même couleur d'une visite à l'autre.
+const PALETTE = ['#1B2230', '#B5483D', '#4A6B5C', '#8C6F44', '#47597E'];
+
+function cityColor(city) {
+  let hash = 0;
+  for (const ch of String(city || '')) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+  return PALETTE[hash % PALETTE.length];
+}
 
 function makePin(index, color, selected) {
   const el = document.createElement('div');
@@ -68,8 +70,8 @@ export default function GoogleMapView({ pts, sel, onSel }) {
     if (!map.current) {
       map.current = new maps.Map(holder.current, {
         mapId: MAP_ID,
-        center: { lat: 37.5665, lng: 126.978 },
-        zoom: 11,
+        center: { lat: 20, lng: 0 },
+        zoom: 2,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: true,
@@ -97,7 +99,7 @@ export default function GoogleMapView({ pts, sel, onSel }) {
         map: map.current,
         position,
         title: p.title,
-        content: makePin(i, CITY_HEX[p.city] || '#1B2230', sel === p.id),
+        content: makePin(i, cityColor(p.city), sel === p.id),
         gmpClickable: true,
         zIndex: sel === p.id ? 999 : i,
       });
@@ -122,7 +124,7 @@ export default function GoogleMapView({ pts, sel, onSel }) {
     if (!ready) return;
     markers.current.forEach(({ marker, index, city }, id) => {
       const selected = id === sel;
-      marker.content = makePin(index, CITY_HEX[city] || '#1B2230', selected);
+      marker.content = makePin(index, cityColor(city), selected);
       marker.zIndex = selected ? 999 : index;
     });
 

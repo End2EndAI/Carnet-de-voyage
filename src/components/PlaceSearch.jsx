@@ -3,9 +3,11 @@ import { suggestPlaces, resolvePlace, newSessionToken, hasMapsKey } from '../lib
 
 /**
  * Champ de recherche d'adresse (Google Places).
+ * `near` : {lat, lng} facultatif — privilégie les lieux autour de l'étape en
+ * cours, sans jamais exclure le reste du monde.
  * Au choix d'un résultat, appelle onPick({ name, address, lat, lng }).
  */
-export default function PlaceSearch({ onPick }) {
+export default function PlaceSearch({ onPick, near = null }) {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
@@ -34,7 +36,7 @@ export default function PlaceSearch({ onPick }) {
     const t = setTimeout(async () => {
       try {
         if (!session.current) session.current = await newSessionToken();
-        const results = await suggestPlaces(query, session.current);
+        const results = await suggestPlaces(query, session.current, near);
         if (!cancelled) {
           setItems(results.slice(0, 6));
           setOpen(true);
@@ -51,7 +53,7 @@ export default function PlaceSearch({ onPick }) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [query]);
+  }, [query, near?.lat, near?.lng]);
 
   const pick = async (item) => {
     setOpen(false);
@@ -79,7 +81,7 @@ export default function PlaceSearch({ onPick }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => items.length && setOpen(true)}
-        placeholder="Gyeongbokgung, Café Onion Seongsu…"
+        placeholder="Nom du lieu, adresse…"
         autoComplete="off"
       />
       <div className="text-[10px] mt-1" style={{ color: 'var(--ink-soft)' }}>

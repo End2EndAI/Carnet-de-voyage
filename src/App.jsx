@@ -139,6 +139,7 @@ function Workspace({ session }) {
     );
 
     const { trip, error: tripError } = await createTrip({
+      userId: session.user.id,
       title: generated?.title?.trim() || answers.destination.trim(),
       nativeName: generated?.native_name || null,
       startDate: answers.startDate,

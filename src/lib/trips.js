@@ -42,14 +42,12 @@ export async function listTrips(userId) {
   };
 }
 
-/**
- * Crée un voyage. `user_id` n'est pas envoyé : la colonne a auth.uid() pour
- * valeur par défaut et la politique RLS refuserait toute autre valeur.
- */
-export async function createTrip({ title, nativeName, startDate, endDate, cities, answers }) {
+/** Crée un voyage pour le compte connecté ; la RLS vérifie aussi cet identifiant. */
+export async function createTrip({ userId, title, nativeName, startDate, endDate, cities, answers }) {
   const { data, error } = await supabase
     .from(TABLE)
     .insert({
+      user_id: userId,
       title: title.trim(),
       native_name: nativeName || null,
       start_date: startDate || null,

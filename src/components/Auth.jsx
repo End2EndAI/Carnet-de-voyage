@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { signUp, signIn, resetPassword } from '../lib/auth.js';
+import { signUp, signIn, resetPassword, updatePassword } from '../lib/auth.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function Auth() {
-  const [mode, setMode] = useState('signin'); // signin | signup | forgot
+export default function Auth({ reset = false, onResetDone }) {
+  const [mode, setMode] = useState(reset ? 'reset' : 'signin'); // signin | signup | forgot | reset
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
   const emailOk = EMAIL_RE.test(email.trim());
-  const valid = mode === 'forgot' ? emailOk : emailOk && password.length >= 6;
+  const valid = mode === 'forgot' ? emailOk
+    : mode === 'reset' ? password.length >= 6 && password === confirmation
+      : emailOk && password.length >= 6;
 
   const switchTo = (next) => {
     setMode(next);
@@ -27,7 +30,11 @@ export default function Auth() {
     setError(null);
     setNotice(null);
 
-    if (mode === 'signup') {
+    if (mode === 'reset') {
+      const err = await updatePassword(password);
+      if (err) setError(err);
+      else onResetDone();
+    } else if (mode === 'signup') {
       const { error: err, needsConfirmation } = await signUp(email, password);
       if (err) setError(err);
       // Sans confirmation par email, la session arrive toute seule et
@@ -60,14 +67,16 @@ export default function Auth() {
         </div>
 
         <h1 className="disp text-[2.1rem] leading-none mb-2" style={{ fontWeight: 350, fontStyle: 'italic' }}>
-          Votre carnet
+          {mode === 'reset' ? 'Nouveau mot de passe' : 'Votre carnet'}
         </h1>
         <p className="text-sm mb-7 leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
-          Préparez chaque voyage : vos étapes, vos idées de visite, vos verdicts,
-          sur une carte. Un compte, vos carnets, rien que les vôtres.
+          {mode === 'reset'
+            ? 'Choisissez le nouveau mot de passe de votre compte.'
+            : <>Préparez chaque voyage : vos étapes, vos idées de visite, vos verdicts,
+              sur une carte. Un compte, vos carnets, rien que les vôtres.</>}
         </p>
 
-        <div className="flex gap-2 mb-5">
+        {mode !== 'reset' && <div className="flex gap-2 mb-5">
           {[['signin', 'Se connecter'], ['signup', 'Créer un compte']].map(([id, label]) => (
             <button key={id} type="button" onClick={() => switchTo(id)}
               className="px-3.5 py-1.5 rounded-full text-[11px] uppercase tracking-wide"
@@ -80,19 +89,30 @@ export default function Auth() {
               {label}
             </button>
           ))}
-        </div>
+        </div>}
 
         <form onSubmit={submit}>
-          <label>Adresse email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-            placeholder="vous@exemple.com" autoComplete="email" autoFocus />
+          {mode !== 'reset' && <>
+            <label>Adresse email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder="vous@exemple.com" autoComplete="email" autoFocus />
+          </>}
 
           {mode !== 'forgot' && (
             <div className="mt-3">
-              <label>Mot de passe</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              <label htmlFor="auth-password">Mot de passe</label>
+              <input id="auth-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="6 caractères minimum"
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
+                autoComplete={mode === 'signup' || mode === 'reset' ? 'new-password' : 'current-password'}
+                autoFocus={mode === 'reset'} />
+            </div>
+          )}
+
+          {mode === 'reset' && (
+            <div className="mt-3">
+              <label htmlFor="auth-password-confirmation">Confirmer le mot de passe</label>
+              <input id="auth-password-confirmation" type="password" value={confirmation} onChange={(e) => setConfirmation(e.target.value)}
+                placeholder="Retapez le mot de passe" autoComplete="new-password" />
             </div>
           )}
 
@@ -115,12 +135,13 @@ export default function Auth() {
               background: valid ? 'var(--ink)' : 'var(--line)', color: 'var(--paper)',
               fontWeight: 600, cursor: valid && !busy ? 'pointer' : 'not-allowed',
             }}>
-            {busy ? '…' : mode === 'signup' ? 'Créer mon compte'
-              : mode === 'signin' ? 'Entrer' : 'Envoyer le lien'}
+            {busy ? '…' : mode === 'reset' ? 'Changer mon mot de passe'
+              : mode === 'signup' ? 'Créer mon compte'
+                : mode === 'signin' ? 'Entrer' : 'Envoyer le lien'}
           </button>
         </form>
 
-        <div className="mt-4 text-[11px]" style={{ color: 'var(--ink-soft)' }}>
+        {mode !== 'reset' && <div className="mt-4 text-[11px]" style={{ color: 'var(--ink-soft)' }}>
           {mode === 'forgot' ? (
             <button onClick={() => switchTo('signin')} className="underline">Retour à la connexion</button>
           ) : mode === 'signin' ? (
@@ -128,7 +149,7 @@ export default function Auth() {
           ) : (
             <span>En créant un compte, vos carnets ne sont visibles que par vous.</span>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );

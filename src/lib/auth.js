@@ -57,6 +57,12 @@ export async function resetPassword(email) {
   return error ? translate(error.message) : null;
 }
 
+export async function updatePassword(password) {
+  if (!hasSupabase) return NOT_CONFIGURED;
+  const { error } = await supabase.auth.updateUser({ password });
+  return error ? translate(error.message) : null;
+}
+
 export async function getSession() {
   if (!hasSupabase) return null;
   const { data } = await supabase.auth.getSession();
@@ -65,7 +71,7 @@ export async function getSession() {
 
 export function onAuthChange(callback) {
   if (!hasSupabase) return () => {};
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => callback(session ?? null));
+  const { data } = supabase.auth.onAuthStateChange((event, session) => callback(session ?? null, event));
   return () => data.subscription.unsubscribe();
 }
 
@@ -79,4 +85,8 @@ export function cleanAuthHash() {
   if (window.location.hash.includes('access_token')) {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
+}
+
+export function isPasswordRecovery() {
+  return new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery';
 }

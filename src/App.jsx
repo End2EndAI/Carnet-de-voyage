@@ -8,7 +8,7 @@ import PlaceSearch from './components/PlaceSearch.jsx';
 import Auth from './components/Auth.jsx';
 import TripList from './components/TripList.jsx';
 import NewTripWizard from './components/NewTripWizard.jsx';
-import { getSession, onAuthChange, signOut, cleanAuthHash } from './lib/auth.js';
+import { getSession, onAuthChange, signOut, cleanAuthHash, isPasswordRecovery } from './lib/auth.js';
 
 const VERDICTS = {
   oui:    { bg: "rgba(74,107,92,.14)",   color: "var(--jade)",       label: "OUI" },
@@ -25,6 +25,7 @@ const LAST_TRIP_KEY = 'carnet-dernier-voyage';
 export default function App() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [recovering, setRecovering] = useState(isPasswordRecovery);
 
   useEffect(() => {
     getSession().then((s) => {
@@ -32,8 +33,9 @@ export default function App() {
       setChecking(false);
       cleanAuthHash();
     });
-    return onAuthChange((s) => {
+    return onAuthChange((s, event) => {
       setSession(s);
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true);
       cleanAuthHash();
     });
   }, []);
@@ -41,6 +43,7 @@ export default function App() {
   if (!hasSupabase) return <NotConfigured />;
   if (checking) return <Splash>Chargement…</Splash>;
   if (!session) return <Auth />;
+  if (recovering) return <Auth reset onResetDone={() => setRecovering(false)} />;
 
   return <Workspace key={session.user.id} session={session} />;
 }

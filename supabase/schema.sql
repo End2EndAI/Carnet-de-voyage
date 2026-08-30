@@ -247,7 +247,7 @@ drop policy if exists "trips_update" on public.trips;
 drop policy if exists "trips_delete" on public.trips;
 
 create policy "trips_select" on public.trips
-  for select to authenticated using (public.can_read_trip(id));
+  for select to authenticated using (user_id = auth.uid() or public.can_read_trip(id));
 create policy "trips_insert" on public.trips
   for insert to authenticated with check (user_id = auth.uid());
 create policy "trips_update" on public.trips

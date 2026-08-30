@@ -651,9 +651,11 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const valid = f.title.trim().length > 0;
 
-  // `over` permet de demander la photo d'un lieu qui vient d'être choisi, sans
-  // attendre que l'état du formulaire soit à jour. Un `placeId` explicitement
-  // vide écrase l'ancien : sinon un nouveau lieu hériterait de sa photo.
+  // Affiche la photo du lieu. Jamais déclenché à la main : le formulaire
+  // l'appelle quand un lieu vient d'être choisi ou décrit par l'IA.
+  // `over` porte alors ce lieu, l'état du formulaire n'étant pas encore à jour.
+  // Un `placeId` explicitement vide écrase l'ancien : sinon un nouveau lieu
+  // hériterait de la photo du précédent.
   const askPhoto = (over = {}) =>
     setPhotoOf({
       title: (over.title ?? f.title).trim(),
@@ -753,15 +755,6 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
                 cursor: (!f.title.trim() || aiState === "loading") ? "not-allowed" : "pointer",
               }}>
               {aiState === "loading" ? "Génération…" : "Générer avec l'IA"}
-            </button>
-            <button type="button" onClick={() => askPhoto()} disabled={!f.title.trim()}
-              className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
-              style={{
-                border: "1px solid var(--gold-deep)", color: "var(--gold-deep)", fontWeight: 600,
-                opacity: f.title.trim() ? 1 : 0.5,
-                cursor: f.title.trim() ? "pointer" : "not-allowed",
-              }}>
-              Chercher une photo
             </button>
             <button type="button" onClick={resetFields}
               className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"

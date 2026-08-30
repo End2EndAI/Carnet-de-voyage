@@ -19,6 +19,9 @@ export default function PlacePhoto({
 }) {
   const [state, setState] = useState('loading'); // loading | found | none | error
   const [photo, setPhoto] = useState(null);
+  // Le message de Google est conservé tel quel : « API non activée », « clé
+  // refusée »… sont des pannes de configuration, indevinables sans le détail.
+  const [reason, setReason] = useState(null);
 
   useEffect(() => {
     if (!hasMapsKey || !String(title || '').trim()) {
@@ -37,10 +40,11 @@ export default function PlacePhoto({
         setState(found ? 'found' : 'none');
         if (found?.placeId && found.placeId !== placeId) onResolved?.(found.placeId);
       })
-      .catch(() => {
-        // Illustration facultative : un échec de recherche ne doit pas
-        // encombrer la fiche d'un message d'erreur.
-        if (!cancelled) setState('error');
+      .catch((err) => {
+        console.error('Photo Google indisponible :', err);
+        if (cancelled) return;
+        setReason(err?.message || null);
+        setState('error');
       });
 
     return () => { cancelled = true; };
@@ -58,12 +62,14 @@ export default function PlacePhoto({
     );
   }
 
+  // Sur une fiche, l'absence d'image se passe de commentaire. Dans le
+  // formulaire, où la photo a été demandée, le silence passerait pour un bug.
   if (state !== 'found') {
     if (!showEmpty) return null;
     return (
-      <p className="text-[10px] mb-3" style={{ color: 'var(--ink-soft)' }}>
+      <p className="text-[10px] mb-3" style={{ color: state === 'error' ? 'var(--vermillion)' : 'var(--ink-soft)' }}>
         {state === 'error'
-          ? "La recherche de photo n'a pas abouti."
+          ? `Recherche de photo impossible${reason ? ` : ${reason}` : ''}`
           : 'Aucune photo Google pour ce lieu.'}
       </p>
     );
@@ -75,7 +81,7 @@ export default function PlacePhoto({
         src={photo.url}
         alt={`Photo de ${title}`}
         loading="lazy"
-        onError={() => setState('error')}
+        onError={() => { setReason("l'image n'a pas pu être chargée"); setState('error'); }}
         style={{ display: 'block', width: '100%', aspectRatio: '16 / 10', objectFit: 'cover' }}
       />
       {/* Attribution de l'auteur : exigée par les conditions d'usage de Google. */}

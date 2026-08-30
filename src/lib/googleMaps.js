@@ -87,16 +87,23 @@ export async function suggestPlaces(input, sessionToken, near = null) {
     });
 }
 
-/** Récupère nom + coordonnées d'une suggestion sélectionnée. */
+/**
+ * Récupère nom, coordonnées et photo d'une suggestion sélectionnée.
+ * La photo est demandée dans le même appel que le reste : une fois le lieu
+ * choisi, l'illustrer ne coûte alors aucune requête supplémentaire.
+ */
 export async function resolvePlace(suggestion) {
   const place = suggestion.toPlace();
-  await place.fetchFields({ fields: ['displayName', 'location', 'formattedAddress'] });
+  await place.fetchFields({ fields: ['id', 'displayName', 'location', 'formattedAddress', 'photos'] });
   const loc = place.location;
+  const photo = firstPhoto(place);
+  if (place.id) photoCache.set(`id:${place.id}`, photo);
   return {
     name: place.displayName || suggestion.main,
     address: place.formattedAddress || suggestion.secondary,
     lat: typeof loc?.lat === 'function' ? loc.lat() : loc?.lat,
     lng: typeof loc?.lng === 'function' ? loc.lng() : loc?.lng,
+    placeId: place.id || null,
   };
 }
 
@@ -105,4 +112,97 @@ export async function newSessionToken() {
   const maps = await loadGoogleMaps();
   const { AutocompleteSessionToken } = await maps.importLibrary('places');
   return new AutocompleteSessionToken();
+}
+
+// ---------------------------------------------------------------------------
+// Photos des lieux
+// ---------------------------------------------------------------------------
+// Google interdit de conserver les URL de photos, qui expirent. Ce qui se
+// stocke, en revanche, c'est l'identifiant du lieu (`place_id`) : il est
+// stable. L'URL est donc résolue à l'affichage, puis gardée en mémoire le
+// temps de la session pour ne pas refacturer le même lieu à chaque ouverture.
+
+// Largeur demandée : de quoi rester net sur un écran dense sans télécharger
+// une image de plusieurs méga-octets.
+const PHOTO_WIDTH = 900;
+
+// clé → { url, author, authorUri } | null (null = cherché, rien trouvé)
+const photoCache = new Map();
+
+/** Première photo d'un objet Place, mise en forme. `null` s'il n'y en a pas. */
+function firstPhoto(place) {
+  const photo = place?.photos?.[0];
+  if (!photo) return null;
+  const author = photo.authorAttributions?.[0];
+  return {
+    url: photo.getURI({ maxWidth: PHOTO_WIDTH }),
+    author: author?.displayName || '',
+    authorUri: author?.uri || '',
+  };
+}
+
+/** Photo d'un lieu dont on connaît déjà l'identifiant Google. */
+async function photoByPlaceId(placeId) {
+  const key = `id:${placeId}`;
+  if (photoCache.has(key)) return photoCache.get(key);
+
+  const maps = await loadGoogleMaps();
+  const { Place } = await maps.importLibrary('places');
+  const place = new Place({ id: placeId });
+  await place.fetchFields({ fields: ['photos'] });
+
+  const found = firstPhoto(place);
+  photoCache.set(key, found);
+  return found;
+}
+
+/**
+ * Photo d'un lieu qu'on ne connaît que par son nom : une recherche textuelle
+ * retrouve le lieu, l'étape et les coordonnées voisines servant à écarter les
+ * homonymes. Renvoie aussi l'identifiant trouvé, à conserver en base.
+ */
+async function photoByName({ title, city, near }) {
+  const query = [title, city].filter(Boolean).join(', ');
+  const around = near ? `${near.lat.toFixed(2)},${near.lng.toFixed(2)}` : '';
+  const key = `q:${query}|${around}`;
+  if (photoCache.has(key)) return photoCache.get(key);
+
+  const maps = await loadGoogleMaps();
+  const { Place } = await maps.importLibrary('places');
+  const { places } = await Place.searchByText({
+    textQuery: query,
+    fields: ['id', 'photos'],
+    maxResultCount: 1,
+    language: 'fr',
+    ...(near ? { locationBias: { center: near, radius: BIAS_RADIUS_M } } : {}),
+  });
+
+  const place = places?.[0];
+  const photo = firstPhoto(place);
+  const found = place && photo ? { placeId: place.id, ...photo } : null;
+  photoCache.set(key, found);
+  if (place) photoCache.set(`id:${place.id}`, photo);
+  return found;
+}
+
+/**
+ * Cherche une image illustrant un lieu, par identifiant Google si on l'a,
+ * sinon par son nom. Retourne { placeId, url, author, authorUri } ou `null`
+ * quand aucune photo n'existe pour ce lieu.
+ */
+export async function findPlacePhoto({ placeId, title, city, near }) {
+  if (!hasMapsKey) return null;
+
+  if (placeId) {
+    // Un identifiant devenu invalide ne doit pas priver la fiche d'image :
+    // on retombe alors sur la recherche par nom.
+    try {
+      const photo = await photoByPlaceId(placeId);
+      if (photo) return { placeId, ...photo };
+    } catch (err) {
+      console.error('Lieu Google introuvable, recherche par nom :', err?.message);
+    }
+  }
+  if (!String(title || '').trim()) return null;
+  return photoByName({ title, city, near });
 }

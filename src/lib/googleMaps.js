@@ -94,7 +94,8 @@ export async function suggestPlaces(input, sessionToken, near = null) {
  */
 export async function resolvePlace(suggestion) {
   const place = suggestion.toPlace();
-  await place.fetchFields({ fields: ['id', 'displayName', 'location', 'formattedAddress', 'photos'] });
+  // `id` n'est pas un champ à demander : il est toujours porté par l'objet Place.
+  await place.fetchFields({ fields: ['displayName', 'location', 'formattedAddress', 'photos'] });
   const loc = place.location;
   const photo = firstPhoto(place);
   if (place.id) photoCache.set(`id:${place.id}`, photo);
@@ -171,7 +172,7 @@ async function photoByName({ title, city, near }) {
   const { Place } = await maps.importLibrary('places');
   const { places } = await Place.searchByText({
     textQuery: query,
-    fields: ['id', 'photos'],
+    fields: ['photos'],
     maxResultCount: 1,
     language: 'fr',
     ...(near ? { locationBias: { center: near, radius: BIAS_RADIUS_M } } : {}),

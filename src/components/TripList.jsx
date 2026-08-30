@@ -1,8 +1,10 @@
-import React from 'react';
-import { formatDates } from '../lib/trips.js';
+import React, { useEffect, useState } from 'react';
+import { changeShare, formatDates, listShares, removeShare, shareTrip } from '../lib/trips.js';
 import { signOut } from '../lib/auth.js';
 
 export default function TripList({ trips, email, loading, error, onOpen, onNew, onDelete }) {
+  const [sharing, setSharing] = useState(null);
+
   return (
     <div className="min-h-screen w-full" style={{ background: 'var(--bg)', color: 'var(--ink)' }}>
       <div className="max-w-2xl mx-auto grain sans">
@@ -59,12 +61,25 @@ export default function TripList({ trips, email, loading, error, onOpen, onNew, 
                     <div className="text-[11px] mt-1" style={{ color: 'var(--ink-soft)' }}>
                       {(t.cities || []).map((c) => c.label).join(' · ') || 'aucune étape'}
                     </div>
+                    {t.access !== 'owner' && (
+                      <div className="text-[9px] tracking-[.14em] uppercase mt-2" style={{ color: 'var(--indigo)', fontWeight: 700 }}>
+                        Partagé · {t.access === 'write' ? 'écriture' : 'lecture seule'}
+                      </div>
+                    )}
                   </button>
-                  <button onClick={() => onDelete(t)} aria-label={`Supprimer ${t.title}`}
-                    className="px-3.5 flex items-center"
-                    style={{ borderLeft: '1px solid var(--line)', color: 'var(--ink-soft)', fontSize: 16 }}>
-                    ✕
-                  </button>
+                  {t.access === 'owner' && (
+                    <div className="flex flex-col" style={{ borderLeft: '1px solid var(--line)' }}>
+                      <button onClick={() => setSharing(t)} className="flex-1 px-3 text-[10px] uppercase tracking-wide"
+                        style={{ color: 'var(--indigo)', fontWeight: 600 }}>
+                        Partager
+                      </button>
+                      <button onClick={() => onDelete(t)} aria-label={`Supprimer ${t.title}`}
+                        className="px-3 py-2.5 flex items-center justify-center"
+                        style={{ borderTop: '1px solid var(--line)', color: 'var(--ink-soft)', fontSize: 14 }}>
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -75,6 +90,94 @@ export default function TripList({ trips, email, loading, error, onOpen, onNew, 
           {email}
           <button onClick={signOut} className="ml-2 underline tracking-[.2em] uppercase">Se déconnecter</button>
         </footer>
+      </div>
+      {sharing && <ShareTrip trip={sharing} onClose={() => setSharing(null)} />}
+    </div>
+  );
+}
+
+function ShareTrip({ trip, onClose }) {
+  const [shares, setShares] = useState([]);
+  const [email, setEmail] = useState('');
+  const [access, setAccess] = useState('read');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const refresh = async () => {
+    const result = await listShares(trip.id);
+    setShares(result.shares);
+    setError(result.error);
+  };
+
+  useEffect(() => { refresh(); }, [trip.id]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!email.trim()) return;
+    setBusy(true);
+    const err = await shareTrip(trip.id, email, access);
+    setError(err);
+    if (!err) { setEmail(''); await refresh(); }
+    setBusy(false);
+  };
+
+  const change = async (member, nextAccess) => {
+    const err = await changeShare(trip.id, member.user_id, nextAccess);
+    setError(err);
+    if (!err) setShares((current) => current.map((item) => (
+      item.user_id === member.user_id ? { ...item, access: nextAccess } : item
+    )));
+  };
+
+  const remove = async (member) => {
+    const err = await removeShare(trip.id, member.user_id);
+    setError(err);
+    if (!err) setShares((current) => current.filter((item) => item.user_id !== member.user_id));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(27,34,48,.45)' }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="share-title"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sans"
+        style={{ background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--line)' }}>
+        <h3 id="share-title" className="disp text-xl" style={{ fontWeight: 600 }}>Partager « {trip.title} »</h3>
+        <p className="text-xs mt-1 mb-5" style={{ color: 'var(--ink-soft)' }}>
+          Votre ami doit déjà avoir créé son compte avec cette adresse.
+        </p>
+
+        <form onSubmit={submit} className="space-y-3">
+          <div><label>Adresse email</label><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <div><label>Accès</label><select value={access} onChange={(e) => setAccess(e.target.value)}>
+            <option value="read">Lecture</option>
+            <option value="write">Écriture</option>
+          </select></div>
+          <button disabled={busy} className="w-full py-2.5 rounded text-sm"
+            style={{ background: 'var(--ink)', color: 'var(--paper)', fontWeight: 600, opacity: busy ? .6 : 1 }}>
+            {busy ? 'Partage…' : 'Partager'}
+          </button>
+        </form>
+
+        {error && <p className="text-xs mt-3" style={{ color: 'var(--vermillion)' }}>{error}</p>}
+
+        {shares.length > 0 && (
+          <div className="mt-5 pt-4 space-y-2" style={{ borderTop: '1px solid var(--line)' }}>
+            {shares.map((member) => (
+              <div key={member.user_id} className="flex items-center gap-2">
+                <span className="text-xs flex-1 min-w-0 truncate">{member.email}</span>
+                <select value={member.access} onChange={(e) => change(member, e.target.value)}
+                  aria-label={`Accès de ${member.email}`} style={{ width: 'auto', fontSize: 11, padding: '5px 7px' }}>
+                  <option value="read">Lecture</option>
+                  <option value="write">Écriture</option>
+                </select>
+                <button onClick={() => remove(member)} aria-label={`Retirer ${member.email}`}
+                  style={{ color: 'var(--vermillion)' }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={onClose} className="w-full mt-5 py-2.5 rounded text-sm"
+          style={{ border: '1px solid var(--line)', color: 'var(--ink)', fontWeight: 600 }}>Fermer</button>
       </div>
     </div>
   );

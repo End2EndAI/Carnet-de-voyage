@@ -27,12 +27,19 @@ export function normalizeCities(cities) {
 }
 
 /** Les voyages du compte connecté, du plus récent au plus ancien. */
-export async function listTrips() {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .order('created_at', { ascending: false });
-  return { trips: data || [], error: error?.message || null };
+export async function listTrips(userId) {
+  const [{ data, error }, { data: memberships, error: membershipsError }] = await Promise.all([
+    supabase.from(TABLE).select('*').order('created_at', { ascending: false }),
+    supabase.from('trip_members').select('trip_id, access').eq('user_id', userId),
+  ]);
+  const accessByTrip = new Map((memberships || []).map((m) => [m.trip_id, m.access]));
+  return {
+    trips: (data || []).map((trip) => ({
+      ...trip,
+      access: trip.user_id === userId ? 'owner' : accessByTrip.get(trip.id),
+    })),
+    error: error?.message || membershipsError?.message || null,
+  };
 }
 
 /**
@@ -52,7 +59,7 @@ export async function createTrip({ title, nativeName, startDate, endDate, cities
     })
     .select()
     .single();
-  return { trip: data, error: error?.message || null };
+  return { trip: data ? { ...data, access: 'owner' } : null, error: error?.message || null };
 }
 
 export async function updateTrip(id, patch) {
@@ -63,6 +70,42 @@ export async function updateTrip(id, patch) {
 /** Supprime le voyage et, par cascade en base, toutes ses idées. */
 export async function deleteTrip(id) {
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
+  return error?.message || null;
+}
+
+export async function listShares(tripId) {
+  const { data, error } = await supabase
+    .from('trip_members')
+    .select('user_id, email, access')
+    .eq('trip_id', tripId)
+    .order('email');
+  return { shares: data || [], error: error?.message || null };
+}
+
+export async function shareTrip(tripId, email, access) {
+  const { error } = await supabase.rpc('share_trip', {
+    target_trip: tripId,
+    target_email: email.trim().toLowerCase(),
+    target_access: access,
+  });
+  return error?.message || null;
+}
+
+export async function changeShare(tripId, userId, access) {
+  const { error } = await supabase
+    .from('trip_members')
+    .update({ access })
+    .eq('trip_id', tripId)
+    .eq('user_id', userId);
+  return error?.message || null;
+}
+
+export async function removeShare(tripId, userId) {
+  const { error } = await supabase
+    .from('trip_members')
+    .delete()
+    .eq('trip_id', tripId)
+    .eq('user_id', userId);
   return error?.message || null;
 }
 

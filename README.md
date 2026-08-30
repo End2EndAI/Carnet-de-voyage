@@ -1,12 +1,13 @@
 # Carnet de voyage
 
-Application de préparation de voyage multi-comptes. Chacun crée son compte,
-ses voyages, et ne voit que les siens.
+Application de préparation de voyage multi-comptes. Chacun crée son compte et
+ses voyages, puis peut les partager avec les personnes de son choix.
 
 ## Fonctionnalités
 
 - **Inscription et connexion** par email + mot de passe
 - **Plusieurs voyages par compte**, chacun avec ses étapes
+- **Partage d'un voyage** avec un autre compte, en lecture ou en écriture
 - **Création guidée** : cinq questions (destination, dates, étapes, centres
   d'intérêt, rythme) et le carnet se pré-remplit avec des lieux suggérés
 - **Ajouter / modifier / supprimer** des idées de visite
@@ -73,10 +74,10 @@ doivent couvrir l'URL de production et `http://localhost:5173/**`.
 
 ## Cloisonnement des données
 
-`trips.user_id` et `ideas.user_id` ont `auth.uid()` pour valeur par défaut :
-le client n'envoie jamais l'identifiant du propriétaire. Les politiques RLS
-n'autorisent que `user_id = auth.uid()`, en lecture comme en écriture, et sont
-limitées au rôle `authenticated` — sans session, les tables sont invisibles.
+Les propriétaires gardent le contrôle du voyage et de ses partages. Un membre
+peut lire un voyage partagé, et modifier ses idées uniquement si l'accès
+« écriture » lui a été donné. Les politiques RLS appliquent ces droits en base
+et sont limitées au rôle `authenticated` — sans session, les tables sont invisibles.
 
 Un compte ne peut donc ni lire, ni modifier, ni s'attribuer les données d'un
 autre, même en manipulant les requêtes depuis le navigateur.

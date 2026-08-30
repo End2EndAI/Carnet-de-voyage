@@ -4,8 +4,8 @@ const TABLE = 'ideas';
 
 // ---------- Mapping JS <-> colonnes Postgres ----------
 // `desc` et `when` sont des mots réservés en SQL : stockés sous `description`
-// et `when_note`. `user_id` n'est jamais envoyé — auth.uid() est la valeur par
-// défaut de la colonne, et la politique RLS refuse toute autre valeur.
+// et `when_note`. `user_id` n'est jamais envoyé : la base rattache toujours
+// l'idée au propriétaire du voyage, y compris quand un membre l'ajoute.
 function toRow(idea) {
   const row = {
     city: idea.city,

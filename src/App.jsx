@@ -88,12 +88,12 @@ function Workspace({ session }) {
   const [genWarning, setGenWarning] = useState(null);
 
   const refresh = useCallback(async () => {
-    const { trips: list, error: err } = await listTrips();
+    const { trips: list, error: err } = await listTrips(session.user.id);
     setTrips(list);
     setError(err);
     setLoading(false);
     return list;
-  }, []);
+  }, [session.user.id]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -236,6 +236,7 @@ function Workspace({ session }) {
 // ---------- Carnet d'un voyage ----------
 function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
   const cities = trip.cities?.length ? trip.cities : [{ id: 'etape', label: trip.title, native: '', note: '' }];
+  const canWrite = trip.access === 'owner' || trip.access === 'write';
 
   const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -365,6 +366,11 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
               <div className="text-xs mt-2" style={{ color: "var(--ink-soft)" }}>
                 {formatDates(trip)} · {ideas.length} idée{ideas.length > 1 ? "s" : ""}
               </div>
+              {trip.access !== 'owner' && (
+                <div className="text-[10px] tracking-[.14em] uppercase mt-1.5" style={{ color: "var(--indigo)", fontWeight: 600 }}>
+                  Voyage partagé · {canWrite ? "écriture" : "lecture seule"}
+                </div>
+              )}
             </div>
             <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
               {loading && <span className="text-[10px]" style={{ color: "var(--ink-soft)" }}>chargement…</span>}
@@ -427,11 +433,13 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
               style={{ background: favOnly ? "var(--vermillion)" : "transparent", color: favOnly ? "var(--paper)" : "var(--ink-soft)", border: `1px solid ${favOnly ? "var(--vermillion)" : "var(--line)"}`, fontWeight: 600 }}>
               ★ Favoris
             </button>
-            <button onClick={() => { setFormSession(s => s + 1); setEditing({ city, verdict: "voir" }); }}
-              className="ml-auto px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
-              style={{ background: "var(--vermillion)", color: "var(--paper)", fontWeight: 600 }}>
-              + Ajouter
-            </button>
+            {canWrite && (
+              <button onClick={() => { setFormSession(s => s + 1); setEditing({ city, verdict: "voir" }); }}
+                className="ml-auto px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
+                style={{ background: "var(--vermillion)", color: "var(--paper)", fontWeight: 600 }}>
+                + Ajouter
+              </button>
+            )}
           </div>
         </div>
 
@@ -483,13 +491,13 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
               <div className="text-xs" style={{ color: "var(--ink-soft)" }}>
                 {favOnly && cityIdeasAll.length > 0
                   ? "Marquez une idée avec l'étoile pour la retrouver ici."
-                  : "Ajoutez une idée avec le bouton ci-dessus."}
+                  : canWrite ? "Ajoutez une idée avec le bouton ci-dessus." : "Aucune idée dans cette étape."}
               </div>
             </div>
           ) : (
             <div className="space-y-3">
               {listIdeas.map(i => (
-                <Card key={i.id} d={i} open={sel === i.id}
+                <Card key={i.id} d={i} open={sel === i.id} canWrite={canWrite}
                   onToggle={() => setSel(sel === i.id ? null : i.id)}
                   onToggleFav={() => toggleFavori(i)}
                   onEdit={() => { setFormSession(s => s + 1); setEditing(i); }}
@@ -505,11 +513,11 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
         </footer>
       </div>
 
-      {editing && (
+      {canWrite && editing && (
         <Form key={formSession} init={editing} cities={cities} near={cityCenter}
           destination={trip.title} onSave={save} onCancel={() => setEditing(null)} />
       )}
-      {confirmDel && (
+      {canWrite && confirmDel && (
         <Confirm
           title="Supprimer ?"
           message={<>« <span style={{ color: "var(--ink)", fontWeight: 500 }}>{confirmDel.title}</span> » sera retiré de la liste.</>}
@@ -523,7 +531,7 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
 }
 
 // ---------- Fiche ----------
-function Card({ d, open, onToggle, onToggleFav, onEdit, onDelete }) {
+function Card({ d, open, canWrite, onToggle, onToggleFav, onEdit, onDelete }) {
   const v = VERDICTS[d.verdict] || VERDICTS.voir;
   return (
     <article className="rounded-lg overflow-hidden" style={{ background: "var(--paper)", border: "1px solid var(--line)" }}>
@@ -544,12 +552,17 @@ function Card({ d, open, onToggle, onToggleFav, onEdit, onDelete }) {
             </div>
           </div>
         </button>
-        <button type="button" onClick={onToggleFav}
-          aria-label={d.favori ? "Retirer des favoris" : "Ajouter aux favoris"}
-          className="flex-shrink-0 w-8 h-8 flex items-center justify-center"
-          style={{ color: d.favori ? "var(--vermillion)" : "var(--line)", fontSize: 20, lineHeight: 1 }}>
-          {d.favori ? "★" : "☆"}
-        </button>
+        {canWrite ? (
+          <button type="button" onClick={onToggleFav}
+            aria-label={d.favori ? "Retirer des favoris" : "Ajouter aux favoris"}
+            className="flex-shrink-0 w-8 h-8 flex items-center justify-center"
+            style={{ color: d.favori ? "var(--vermillion)" : "var(--line)", fontSize: 20, lineHeight: 1 }}>
+            {d.favori ? "★" : "☆"}
+          </button>
+        ) : d.favori ? (
+          <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center" aria-label="Favori"
+            style={{ color: "var(--vermillion)", fontSize: 20, lineHeight: 1 }}>★</span>
+        ) : null}
       </div>
 
       {open && (
@@ -566,10 +579,14 @@ function Card({ d, open, onToggle, onToggleFav, onEdit, onDelete }) {
           {d.when && <Field label="À caser">{d.when}</Field>}
 
           <div className="flex items-center gap-2 mt-4 pt-3 flex-wrap" style={{ borderTop: "1px solid var(--line)" }}>
-            <button onClick={onEdit} className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
-              style={{ border: "1px solid var(--line)", color: "var(--ink)", fontWeight: 600 }}>Modifier</button>
-            <button onClick={onDelete} className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
-              style={{ border: "1px solid var(--vermillion)", color: "var(--vermillion)", fontWeight: 600 }}>Supprimer</button>
+            {canWrite && (
+              <>
+                <button onClick={onEdit} className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
+                  style={{ border: "1px solid var(--line)", color: "var(--ink)", fontWeight: 600 }}>Modifier</button>
+                <button onClick={onDelete} className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
+                  style={{ border: "1px solid var(--vermillion)", color: "var(--vermillion)", fontWeight: 600 }}>Supprimer</button>
+              </>
+            )}
             {d.lat && d.lng && (
               <a href={gmaps(d)} target="_blank" rel="noopener noreferrer"
                 className="ml-auto px-3 py-1.5 rounded text-[11px]"

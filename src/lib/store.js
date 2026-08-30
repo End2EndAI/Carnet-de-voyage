@@ -20,6 +20,7 @@ function toRow(idea) {
     when_note: idea.when || null,
     lat: Number.isFinite(idea.lat) ? idea.lat : null,
     lng: Number.isFinite(idea.lng) ? idea.lng : null,
+    place_id: idea.placeId || null,
     origin: idea.origin || 'perso',
     favori: Boolean(idea.favori),
   };
@@ -47,6 +48,7 @@ function fromRow(row) {
   if (row.when_note) idea.when = row.when_note;
   if (row.lat !== null && row.lat !== undefined) idea.lat = Number(row.lat);
   if (row.lng !== null && row.lng !== undefined) idea.lng = Number(row.lng);
+  if (row.place_id) idea.placeId = row.place_id;
   if (row.favori) idea.favori = true;
   return idea;
 }

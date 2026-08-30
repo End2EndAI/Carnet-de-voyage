@@ -283,6 +283,19 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
   );
 
   const mapPts = useMemo(() => cityIdeas.filter(i => i.lat && i.lng), [cityIdeas]);
+
+  // Où se trouve l'étape, d'après les lieux déjà placés : sert d'indice à la
+  // recherche d'adresse. Calculé sur toute l'étape, pas sur `cityIdeas`, pour
+  // qu'un filtre ou un favori n'aille pas déplacer le centre. Reste null tant
+  // qu'aucun lieu n'a de coordonnées — la recherche est alors mondiale.
+  const cityCenter = useMemo(() => {
+    const placed = ideas.filter(i => i.city === city && Number.isFinite(i.lat) && Number.isFinite(i.lng));
+    if (!placed.length) return null;
+    return {
+      lat: placed.reduce((sum, i) => sum + i.lat, 0) / placed.length,
+      lng: placed.reduce((sum, i) => sum + i.lng, 0) / placed.length,
+    };
+  }, [ideas, city]);
   // En vue carte, une sélection filtre la liste sur ce seul lieu.
   const listIdeas = useMemo(
     () => (view === "carte" && sel ? cityIdeas.filter(i => i.id === sel) : cityIdeas),
@@ -489,7 +502,10 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
         </footer>
       </div>
 
-      {editing && <Form key={formSession} init={editing} cities={cities} onSave={save} onCancel={() => setEditing(null)} />}
+      {editing && (
+        <Form key={formSession} init={editing} cities={cities} near={cityCenter}
+          destination={trip.title} onSave={save} onCancel={() => setEditing(null)} />
+      )}
       {confirmDel && (
         <Confirm
           title="Supprimer ?"
@@ -573,7 +589,7 @@ function Field({ label, children }) {
 }
 
 // ---------- Formulaire ----------
-function Form({ init, cities, onSave, onCancel }) {
+function Form({ init, cities, near, destination, onSave, onCancel }) {
   // Capturé une seule fois : "Réinitialiser" y revient (blanc pour une nouvelle idée,
   // valeurs d'origine si on modifie une idée existante).
   const initialState = useRef({
@@ -607,7 +623,11 @@ function Form({ init, cities, onSave, onCancel }) {
       const res = await fetch("/api/generate-idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: f.title, lat: f.lat, lng: f.lng, zone: f.zone }),
+        body: JSON.stringify({
+          title: f.title, lat: f.lat, lng: f.lng, zone: f.zone,
+          destination,
+          city: cities.find(c => c.id === f.city)?.label || '',
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Échec de la génération.");
@@ -648,14 +668,14 @@ function Form({ init, cities, onSave, onCancel }) {
         </div>
 
         <div className="p-5 space-y-3.5">
-          <PlaceSearch onPick={(p) => setF(prev => ({
+          <PlaceSearch near={near} onPick={(p) => setF(prev => ({
             ...prev,
             title: p.name || prev.title,
             zone: p.address || prev.zone,
             lat: p.lat ?? prev.lat,
             lng: p.lng ?? prev.lng,
           }))} />
-          <div><label>Nom *</label><input value={f.title} onChange={set("title")} placeholder="Ex : Café Onion Seongsu" /></div>
+          <div><label>Nom *</label><input value={f.title} onChange={set("title")} placeholder="Ex : Café Onion Seongsu, Duomo di Catania…" /></div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <button type="button" onClick={generateWithAI} disabled={!f.title.trim() || aiState === "loading"}
               className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
@@ -674,7 +694,7 @@ function Form({ init, cities, onSave, onCancel }) {
           </div>
           <span className="text-[10px] block -mt-1.5" style={{ color: "var(--ink-soft)" }}>
             L'IA cherche sur le web puis complète les champs vides ci-dessous à partir du nom,
-            de la latitude et de la longitude.
+            de l'étape et des coordonnées.
           </span>
           {aiState === "error" && aiError && (
             <p className="text-[11px]" style={{ color: "var(--vermillion)" }}>{aiError}</p>
@@ -703,13 +723,13 @@ function Form({ init, cities, onSave, onCancel }) {
               </select>
             </div>
           </div>
-          <div><label>Nom local / sous-titre</label><input value={f.kr} onChange={set("kr")} placeholder="성수동 · Café" /></div>
+          <div><label>Nom local / sous-titre</label><input value={f.kr} onChange={set("kr")} placeholder="Nom local · sous-titre" /></div>
           <div><label>Type</label><input value={f.type} onChange={set("type")} placeholder="Café · Brunch" /></div>
           <div><label>Note courte</label><input value={f.note} onChange={set("note")} placeholder="À réserver le week-end" /></div>
           <div><label>Descriptif</label><textarea rows={3} value={f.desc} onChange={set("desc")} /></div>
           <div><label>Quartier</label><input value={f.zone} onChange={set("zone")} /></div>
           <div><label>Mon avis</label><textarea rows={2} value={f.avis} onChange={set("avis")} /></div>
-          <div><label>À caser</label><input value={f.when} onChange={set("when")} placeholder="7 oct, après-midi" /></div>
+          <div><label>À caser</label><input value={f.when} onChange={set("when")} placeholder="Jour 3, après-midi" /></div>
           <div className="grid grid-cols-2 gap-3">
             <div><label>Latitude</label><input value={f.lat} onChange={set("lat")} placeholder="37.5665" inputMode="decimal" /></div>
             <div><label>Longitude</label><input value={f.lng} onChange={set("lng")} placeholder="126.9780" inputMode="decimal" /></div>

@@ -34,7 +34,6 @@ export function loadGoogleMaps() {
       v: 'weekly',
       libraries: 'maps,marker,places',
       language: 'fr',
-      region: 'KR',
       loading: 'async',
       callback: callbackName,
     });
@@ -50,11 +49,16 @@ export function loadGoogleMaps() {
   return loader;
 }
 
+// Rayon de l'indice de localisation : de quoi couvrir une agglomération et ses
+// environs sans écarter un lieu un peu excentré.
+const BIAS_RADIUS_M = 50000;
+
 /**
  * Suggestions d'adresses via la nouvelle API Places.
+ * `near` : {lat, lng} facultatif, pour privilégier les lieux du coin.
  * Retourne [{ id, main, secondary, fetchPlace }].
  */
-export async function suggestPlaces(input, sessionToken) {
+export async function suggestPlaces(input, sessionToken, near = null) {
   if (!input.trim()) return [];
   const maps = await loadGoogleMaps();
   const { AutocompleteSuggestion } = await maps.importLibrary('places');
@@ -62,9 +66,12 @@ export async function suggestPlaces(input, sessionToken) {
   const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
     input,
     sessionToken,
-    // Le carnet ne couvre que la Corée du Sud : on restreint les résultats.
-    includedRegionCodes: ['kr'],
     language: 'fr',
+    // Aucune restriction par pays : un carnet peut aller n'importe où. Quand
+    // l'étape a déjà des lieux placés, on donne leur position en indice pour
+    // que « Duomo » sur un voyage en Sicile ne remonte pas celui de Milan.
+    // `locationBias` reste une préférence : un lieu ailleurs sort quand même.
+    ...(near ? { locationBias: { center: near, radius: BIAS_RADIUS_M } } : {}),
   });
 
   return (suggestions || [])

@@ -135,7 +135,8 @@ export default function NewTripWizard({ onCancel, onCreate, busy, error }) {
   const last = step === steps.length - 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 android-sheet"
+    <div role="dialog" aria-modal="true" aria-labelledby="new-trip-title"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 android-sheet"
       style={{ background: 'rgba(27,34,48,.45)' }}>
       <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto sans"
         style={{ background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--line)' }}>
@@ -146,7 +147,7 @@ export default function NewTripWizard({ onCancel, onCreate, busy, error }) {
             style={{ color: 'var(--vermillion)', fontWeight: 600 }}>
             Nouveau voyage · {step + 1}/{steps.length}
           </div>
-          <h3 className="disp text-xl" style={{ fontWeight: 600 }}>{current.title}</h3>
+          <h3 id="new-trip-title" className="disp text-xl" style={{ fontWeight: 600 }}>{current.title}</h3>
           <p className="text-[11px] mt-1" style={{ color: 'var(--ink-soft)' }}>{current.hint}</p>
         </div>
 

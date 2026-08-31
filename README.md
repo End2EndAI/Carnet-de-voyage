@@ -58,8 +58,15 @@ Sans `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, l'application affiche un
 
 ### 1. Le schéma
 
-Exécuter [`supabase/schema.sql`](supabase/schema.sql) dans le SQL Editor du
-projet. Le fichier est idempotent et peut être rejoué.
+Le schéma de production est versionné dans [`supabase/migrations`](supabase/migrations).
+Après `supabase login` et `supabase link --project-ref …`, appliquez-le avec :
+
+```bash
+supabase db push --linked
+```
+
+[`supabase/schema.sql`](supabase/schema.sql) documente l'ancien déploiement et
+sa reprise de données ; ne le rejouez pas sur une base déjà migrée.
 
 Il crée `trips` et `ideas`, active la Row Level Security sur les deux, et
 supprime l'ancien accès par liste blanche (`allowed_emails`). Les données de
@@ -77,12 +84,9 @@ supprimée à la main.
 Dans *Authentication* → *Sign In / Providers* → *Email* :
 
 - **Allow new users to sign up** : activé, sinon personne ne peut s'inscrire.
-- **Confirm email** : désactivé. Le serveur mail intégré de Supabase est
-  plafonné à **2 emails par heure**, tous usages confondus — avec la
-  confirmation active, la troisième inscription de l'heure échoue. Pour la
-  garder active, configurez d'abord un SMTP externe dans *Authentication* →
-  *Emails*. Le code gère les deux cas : sans session en retour, l'écran invite
-  à ouvrir le lien de confirmation.
+- Configurez d'abord un SMTP externe, puis activez **Confirm email**. Le
+  partage repose sur l'adresse email : une adresse non vérifiée ne doit jamais
+  recevoir l'accès à un carnet.
 
 Dans *Authentication* → *URL Configuration*, la *Site URL* et l'*allow list*
 doivent couvrir l'URL de production et `http://localhost:5173/**`.
@@ -129,9 +133,12 @@ Le test RLS demande Docker et `supabase start`. Il applique le schéma à la bas
 locale uniquement ; il ne touche jamais au projet Supabase distant.
 
 GitHub Actions exécute automatiquement `npm run test:all` sur chaque pull
-request vers `main` et chaque push sur `main`.
+request et chaque push vers `main`.
 
 ## Déploiement
 
 Hébergé sur Vercel, déployé automatiquement à chaque push sur `main`.
 Build : `npm run build` · Dossier de sortie : `dist`.
+
+Les opérations de production (SMTP, pare-feu, alertes et reprise) sont décrites
+dans [OPERATIONS.md](OPERATIONS.md).

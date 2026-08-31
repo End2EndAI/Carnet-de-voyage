@@ -5,6 +5,10 @@ const mock = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('openai', () => ({
   default: class OpenAI { constructor() { this.responses = { create: mock.create }; } },
 }));
+vi.mock('../api/auth.js', () => ({
+  requireUser: vi.fn().mockResolvedValue({ id: 'user-1' }),
+  text: (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '',
+}));
 
 import handler from '../api/generate-idea.js';
 
@@ -44,6 +48,6 @@ describe('generate-idea handler', () => {
     mock.create.mockResolvedValueOnce({ output_text: 'notes' }).mockRejectedValueOnce(new Error('provider failed'));
     const res = response();
     await handler({ method: 'POST', body: { title: 'Duomo' } }, res);
-    expect(res).toMatchObject({ statusCode: 502, body: { error: 'provider failed' } });
+    expect(res).toMatchObject({ statusCode: 502, body: { error: 'La génération est temporairement indisponible.' } });
   });
 });

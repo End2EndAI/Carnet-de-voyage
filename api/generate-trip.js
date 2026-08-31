@@ -7,6 +7,7 @@
 // dans le bundle envoyé au navigateur.
 
 import OpenAI from 'openai';
+import { requireUser, text } from './auth.js';
 
 const MODEL = 'gpt-5.6-luna';
 
@@ -76,7 +77,7 @@ const PACE_LABEL = {
 };
 
 function buildPrompt(a) {
-  const asked = String(a.cities || '')
+  const asked = a.cities
     .split(',').map((s) => s.trim()).filter(Boolean).slice(0, MAX_CITIES);
 
   const lines = [
@@ -100,6 +101,8 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (!await requireUser(req, res)) return;
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     res.status(500).json({
@@ -108,13 +111,27 @@ export default async function handler(req, res) {
     return;
   }
 
-  const answers = req.body?.answers || {};
-  if (!String(answers.destination || '').trim()) {
+  const raw = req.body?.answers;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    res.status(400).json({ error: 'Les réponses sont invalides.' });
+    return;
+  }
+  const answers = {
+    destination: text(raw.destination, 120),
+    cities: text(raw.cities, 500),
+    startDate: text(raw.startDate, 10),
+    endDate: text(raw.endDate, 10),
+    nights: Number.isInteger(raw.nights) && raw.nights > 0 && raw.nights <= 365 ? raw.nights : null,
+    styles: Array.isArray(raw.styles) ? raw.styles.slice(0, 10).map((style) => text(style, 80)).filter(Boolean) : [],
+    pace: text(raw.pace, 30),
+    notes: text(raw.notes, 1500),
+  };
+  if (!answers.destination) {
     res.status(400).json({ error: 'La destination est requise.' });
     return;
   }
 
-  const { text, asked } = buildPrompt(answers);
+  const { text: prompt, asked } = buildPrompt(answers);
 
   try {
     const client = new OpenAI({ apiKey });
@@ -133,7 +150,7 @@ export default async function handler(req, res) {
             'uniquement en français, de façon factuelle, concise et sobre. Le champ "avis" reste ' +
             "un brouillon neutre que le voyageur corrigera, jamais une expérience vécue.",
         },
-        { role: 'user', content: `${text}\n\nPropose les étapes et les lieux.` },
+        { role: 'user', content: `${prompt}\n\nPropose les étapes et les lieux.` },
       ],
       text: {
         format: { type: 'json_schema', name: 'carnet_voyage', schema: TRIP_SCHEMA, strict: true },
@@ -162,6 +179,7 @@ export default async function handler(req, res) {
     trip.cities = (trip.cities || []).slice(0, MAX_CITIES);
     res.status(200).json({ trip });
   } catch (err) {
-    res.status(502).json({ error: err?.message || "Échec de l'appel à OpenAI." });
+    console.error('generate-trip failed:', err?.message);
+    res.status(502).json({ error: 'La génération est temporairement indisponible.' });
   }
 }

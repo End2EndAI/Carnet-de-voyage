@@ -97,6 +97,25 @@ pour tester la génération de carnet et la complétion de fiche en local. Sans
 elles, la création d'un voyage fonctionne quand même — le carnet est
 simplement créé vide, avec un message.
 
+## Tests
+
+```bash
+npm test            # tests unitaires, composants et fonctions serverless
+npm run test:schema # contrat de sécurité du schéma Supabase
+npm run test:rls    # vraies politiques RLS sur Supabase local démarré
+npm run test:e2e    # parcours navigateur Chromium
+npm run test:all    # build puis toutes les vérifications, RLS incluses
+```
+
+Installez Chromium une fois sur une nouvelle machine avec
+`npx playwright install chromium`.
+
+Le test RLS demande Docker et `supabase start`. Il applique le schéma à la base
+locale uniquement ; il ne touche jamais au projet Supabase distant.
+
+GitHub Actions exécute automatiquement `npm run test:all` sur chaque pull
+request vers `main` et chaque push sur `main`.
+
 ## Déploiement
 
 Hébergé sur Vercel, déployé automatiquement à chaque push sur `main`.

@@ -16,6 +16,7 @@
 //     a échoué ou n'a rien trouvé) dans le JSON schema attendu par le formulaire.
 
 import OpenAI from 'openai';
+import { requireUser, text } from './auth.js';
 
 const MODEL = 'gpt-5.6-luna';
 
@@ -110,6 +111,8 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (!await requireUser(req, res)) return;
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     res.status(500).json({
@@ -119,17 +122,16 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
-  const str = (v) => (typeof v === 'string' ? v.trim() : '');
   const lat = Number(body.lat);
   const lng = Number(body.lng);
   const place = {
-    title: str(body.title),
-    zone: str(body.zone),
-    destination: str(body.destination),
-    city: str(body.city),
+    title: text(body.title, 160),
+    zone: text(body.zone, 240),
+    destination: text(body.destination, 120),
+    city: text(body.city, 120),
     lat,
     lng,
-    hasCoords: Number.isFinite(lat) && Number.isFinite(lng),
+    hasCoords: Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180,
   };
 
   if (!place.title) {
@@ -192,7 +194,7 @@ export default async function handler(req, res) {
     const fields = JSON.parse(raw);
     res.status(200).json({ fields, researched: Boolean(research) });
   } catch (err) {
-    const message = err?.message || "Échec de l'appel à OpenAI.";
-    res.status(502).json({ error: message });
+    console.error('generate-idea failed:', err?.message);
+    res.status(502).json({ error: 'La génération est temporairement indisponible.' });
   }
 }

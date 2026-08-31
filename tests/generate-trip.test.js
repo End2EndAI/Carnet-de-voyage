@@ -5,6 +5,10 @@ const mock = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('openai', () => ({
   default: class OpenAI { constructor() { this.responses = { create: mock.create }; } },
 }));
+vi.mock('../api/auth.js', () => ({
+  requireUser: vi.fn().mockResolvedValue({ id: 'user-1' }),
+  text: (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '',
+}));
 
 import handler from '../api/generate-trip.js';
 
@@ -52,6 +56,6 @@ describe('generate-trip handler', () => {
     const res = response();
     await handler({ method: 'POST', body: { answers: { destination: 'Sicile' } } }, res);
     expect(res.statusCode).toBe(502);
-    expect(res.body.error).toBeTruthy();
+    expect(res.body.error).toBe('La génération est temporairement indisponible.');
   });
 });

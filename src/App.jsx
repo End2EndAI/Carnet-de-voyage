@@ -122,7 +122,7 @@ function Workspace({ session }) {
     try {
       const res = await fetch('/api/generate-trip', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ answers }),
       });
       const data = await res.json().catch(() => ({}));
@@ -196,6 +196,7 @@ function Workspace({ session }) {
         key={openTrip.id}
         trip={openTrip}
         email={session.user.email}
+        accessToken={session.access_token}
         warning={genWarning}
         onDismissWarning={() => setGenWarning(null)}
         onBack={back}
@@ -236,7 +237,7 @@ function Workspace({ session }) {
 }
 
 // ---------- Carnet d'un voyage ----------
-function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
+function Carnet({ trip, email, accessToken, warning, onDismissWarning, onBack }) {
   const cities = trip.cities?.length ? trip.cities : [{ id: 'etape', label: trip.title, native: '', note: '' }];
   const canWrite = trip.access === 'owner' || trip.access === 'write';
 
@@ -264,10 +265,12 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
 
   // Applique la modification en local, puis la propage à Supabase.
   const persist = async (next, action) => {
+    const previous = ideas;
     setIdeas(next);
     setSaveState("saving");
     const error = await action();
     if (error) {
+      setIdeas(previous);
       setErrMsg(error);
       setSaveState("error");
     } else {
@@ -288,7 +291,10 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
     [cityIdeasAll, favOnly]
   );
 
-  const mapPts = useMemo(() => cityIdeas.filter(i => i.lat && i.lng), [cityIdeas]);
+  const mapPts = useMemo(
+    () => cityIdeas.filter((i) => Number.isFinite(i.lat) && Number.isFinite(i.lng)),
+    [cityIdeas]
+  );
 
   // Où se trouve l'étape, d'après les lieux déjà placés : sert d'indice à la
   // recherche d'adresse. Calculé sur toute l'étape, pas sur `cityIdeas`, pour
@@ -310,7 +316,6 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
   const countFor = (id) => ideas.filter(i => i.city === id).length;
 
   const save = async (data) => {
-    setEditing(null);
     setSaveState("saving");
     const { idea: saved, error } = await saveIdea(trip.id, {
       ...data,
@@ -319,7 +324,7 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
     if (error || !saved) {
       setErrMsg(error || "Enregistrement impossible.");
       setSaveState("error");
-      return;
+      return false;
     }
     setIdeas(prev => prev.some(i => i.id === saved.id)
       ? prev.map(i => (i.id === saved.id ? saved : i))
@@ -327,6 +332,8 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
     setErrMsg(null);
     setSaveState("saved");
     setTimeout(() => setSaveState(""), 1600);
+    setEditing(null);
+    return true;
   };
 
   const toggleFavori = (idea) => {
@@ -529,7 +536,7 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
       </div>
 
       {canWrite && editing && (
-        <Form key={formSession} init={editing} cities={cities} near={cityCenter}
+        <Form key={formSession} init={editing} cities={cities} near={cityCenter} accessToken={accessToken}
           destination={trip.title} onSave={save} onCancel={() => setEditing(null)} />
       )}
       {canWrite && confirmDel && (
@@ -606,7 +613,7 @@ function Card({ d, open, canWrite, cityLabel, near, onPlaceId, onToggle, onToggl
                   style={{ border: "1px solid var(--vermillion)", color: "var(--vermillion)", fontWeight: 600 }}>Supprimer</button>
               </>
             )}
-            {d.lat && d.lng && (
+            {Number.isFinite(d.lat) && Number.isFinite(d.lng) && (
               <a href={gmaps(d)} target="_blank" rel="noopener noreferrer"
                 className="ml-auto px-3 py-1.5 rounded text-[11px]"
                 style={{ background: "var(--ink)", color: "var(--paper)", fontWeight: 600 }}>Maps ↗</a>
@@ -628,7 +635,7 @@ function Field({ label, children }) {
 }
 
 // ---------- Formulaire ----------
-function Form({ init, cities, near, destination, onSave, onCancel }) {
+function Form({ init, cities, near, destination, accessToken, onSave, onCancel }) {
   // Capturé une seule fois : "Réinitialiser" y revient (blanc pour une nouvelle idée,
   // valeurs d'origine si on modifie une idée existante).
   const initialState = useRef({
@@ -648,6 +655,7 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
   const [aiState, setAiState] = useState("idle"); // idle | loading | error
   const [aiError, setAiError] = useState(null);
   const [aiResearched, setAiResearched] = useState(null); // null tant qu'aucune génération n'a eu lieu
+  const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const valid = f.title.trim().length > 0;
 
@@ -685,7 +693,7 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
     try {
       const res = await fetch("/api/generate-idea", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           title: f.title, lat: f.lat, lng: f.lng, zone: f.zone,
           destination,
@@ -711,23 +719,26 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
     }
   };
 
-  const submit = () => {
-    if (!valid) return;
+  const submit = async () => {
+    if (!valid || saving) return;
     const out = { ...f };
     out.lat = f.lat === "" ? undefined : parseFloat(f.lat);
     out.lng = f.lng === "" ? undefined : parseFloat(f.lng);
     if (isNaN(out.lat) || isNaN(out.lng)) { delete out.lat; delete out.lng; }
-    onSave(out);
+    setSaving(true);
+    await onSave(out);
+    setSaving(false);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+    <div role="dialog" aria-modal="true" aria-labelledby="idea-form-title"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
       style={{ background: "rgba(27,34,48,.45)" }}>
       <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto sans"
         style={{ background: "var(--bg)", borderRadius: 12, border: "1px solid var(--line)" }}>
         <div className="sticky top-0 px-5 py-4 border-b backdrop-blur-md"
           style={{ borderColor: "var(--line)", background: "rgba(242,237,227,.95)" }}>
-          <h3 className="disp text-xl" style={{ fontWeight: 600 }}>
+          <h3 id="idea-form-title" className="disp text-xl" style={{ fontWeight: 600 }}>
             {init.id ? "Modifier" : "Nouvelle idée"}
           </h3>
         </div>
@@ -745,7 +756,7 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
             // Le lieu est identifié : sa photo est déjà chargée, on l'affiche.
             askPhoto({ title: p.name || f.title, placeId: p.placeId });
           }} />
-          <div><label>Nom *</label><input value={f.title} onChange={set("title")} placeholder="Ex : Café Onion Seongsu, Duomo di Catania…" /></div>
+          <div><label htmlFor="idea-title">Nom *</label><input id="idea-title" value={f.title} onChange={set("title")} placeholder="Ex : Café Onion Seongsu, Duomo di Catania…" /></div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <button type="button" onClick={generateWithAI} disabled={!f.title.trim() || aiState === "loading"}
               className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
@@ -824,11 +835,11 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
 
         <div className="sticky bottom-0 px-5 py-4 border-t flex gap-2.5 backdrop-blur-md"
           style={{ borderColor: "var(--line)", background: "rgba(242,237,227,.95)" }}>
-          <button onClick={onCancel} className="flex-1 py-2.5 rounded text-sm"
+          <button onClick={onCancel} disabled={saving} className="flex-1 py-2.5 rounded text-sm"
             style={{ border: "1px solid var(--line)", color: "var(--ink)", fontWeight: 600 }}>Annuler</button>
-          <button onClick={submit} disabled={!valid} className="flex-1 py-2.5 rounded text-sm"
-            style={{ background: valid ? "var(--ink)" : "var(--line)", color: "var(--paper)", fontWeight: 600, cursor: valid ? "pointer" : "not-allowed" }}>
-            Enregistrer
+          <button onClick={submit} disabled={!valid || saving} className="flex-1 py-2.5 rounded text-sm"
+            style={{ background: valid && !saving ? "var(--ink)" : "var(--line)", color: "var(--paper)", fontWeight: 600, cursor: valid && !saving ? "pointer" : "not-allowed" }}>
+            {saving ? "Enregistrement…" : "Enregistrer"}
           </button>
         </div>
       </div>
@@ -839,9 +850,9 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
 // ---------- Confirmation ----------
 function Confirm({ title, message, confirmLabel, onYes, onNo }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "rgba(27,34,48,.45)" }}>
+    <div role="dialog" aria-modal="true" aria-labelledby="confirm-title" className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "rgba(27,34,48,.45)" }}>
       <div className="w-full max-w-sm p-5 sans" style={{ background: "var(--bg)", borderRadius: 12, border: "1px solid var(--line)" }}>
-        <h3 className="disp text-lg mb-2" style={{ fontWeight: 600 }}>{title}</h3>
+        <h3 id="confirm-title" className="disp text-lg mb-2" style={{ fontWeight: 600 }}>{title}</h3>
         <p className="text-sm mb-5 leading-relaxed" style={{ color: "var(--ink-soft)" }}>{message}</p>
         <div className="flex gap-2.5">
           <button onClick={onNo} className="flex-1 py-2.5 rounded text-sm"

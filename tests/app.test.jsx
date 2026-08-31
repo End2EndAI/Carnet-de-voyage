@@ -4,12 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mock = vi.hoisted(() => ({
   listTrips: vi.fn(), createTrip: vi.fn(), loadIdeas: vi.fn(), insertIdeas: vi.fn(),
-  getSession: vi.fn(), onAuthChange: vi.fn(), fetch: vi.fn(),
+  getSession: vi.fn(), onAuthChange: vi.fn(), deleteAccount: vi.fn(), fetch: vi.fn(),
 }));
 
 vi.mock('../src/lib/supabase.js', () => ({ hasSupabase: true }));
 vi.mock('../src/lib/auth.js', () => ({
-  getSession: mock.getSession, onAuthChange: mock.onAuthChange, signOut: vi.fn(),
+  getSession: mock.getSession, onAuthChange: mock.onAuthChange, signOut: vi.fn(), deleteAccount: mock.deleteAccount,
   cleanAuthHash: vi.fn(), isPasswordRecovery: () => false,
 }));
 vi.mock('../src/lib/trips.js', () => ({
@@ -27,6 +27,7 @@ import App from '../src/App.jsx';
 describe('main trip workflow', () => {
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState({}, '', '/');
     mock.getSession.mockResolvedValue({ user: { id: 'user-1', email: 'me@example.com' } });
     mock.onAuthChange.mockReturnValue(() => {});
     mock.listTrips.mockResolvedValue({ trips: [], error: null });
@@ -55,5 +56,25 @@ describe('main trip workflow', () => {
     expect(mock.insertIdeas).not.toHaveBeenCalled();
     expect(await screen.findByText(/Le carnet a été créé, mais les suggestions/)).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { name: 'Sicile' })).toHaveLength(2);
+  });
+
+  it('returns to the trip list on browser Back', async () => {
+    mock.listTrips.mockResolvedValue({ trips: [{
+      id: 'trip-1', title: 'Sicile', cities: [{ id: 'sicile', label: 'Sicile', native: '', note: '' }], access: 'owner',
+    }], error: null });
+    render(<App />);
+
+    fireEvent.click((await screen.findAllByRole('button', { name: /Sicile/ }))[0]);
+    expect(window.history.state.carnetTripId).toBe('trip-1');
+
+    fireEvent.popState(window, { state: { carnetTripId: null } });
+    expect(await screen.findByRole('heading', { name: 'Mes voyages' })).toBeInTheDocument();
+  });
+
+  it('opens account deletion from its public web path', async () => {
+    window.history.replaceState({}, '', '/?delete-account=1');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Supprimer mon compte ?' })).toBeInTheDocument();
   });
 });

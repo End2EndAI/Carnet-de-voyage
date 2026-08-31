@@ -10,7 +10,7 @@ vi.mock('../src/lib/supabase.js', () => ({
   supabase: { auth: mock },
 }));
 
-import { cleanAuthHash, getSession, isPasswordRecovery, signIn, signUp } from '../src/lib/auth.js';
+import { cleanAuthHash, deleteAccount, getSession, isPasswordRecovery, signIn, signUp } from '../src/lib/auth.js';
 
 describe('auth service', () => {
   beforeEach(() => {
@@ -37,5 +37,16 @@ describe('auth service', () => {
     expect(isPasswordRecovery()).toBe(true);
     cleanAuthHash();
     expect(window.location.hash).toBe('');
+  });
+
+  it('deletes the signed-in account through the protected endpoint', async () => {
+    mock.getSession.mockResolvedValue({ data: { session: { access_token: 'token' } } });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) }));
+
+    await expect(deleteAccount()).resolves.toBeNull();
+    expect(fetch).toHaveBeenCalledWith('/api/delete-account', {
+      method: 'DELETE', headers: { Authorization: 'Bearer token' },
+    });
+    expect(mock.signOut).toHaveBeenCalled();
   });
 });

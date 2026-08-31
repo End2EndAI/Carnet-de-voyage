@@ -6,6 +6,7 @@ ses voyages, puis peut les partager avec les personnes de son choix.
 ## Fonctionnalités
 
 - **Inscription et connexion** par email + mot de passe
+- **Suppression de compte** et des données associées depuis l’application
 - **Plusieurs voyages par compte**, chacun avec ses étapes
 - **Partage d'un voyage** avec un autre compte, en lecture ou en écriture
 - **Création guidée** : cinq questions (destination, dates, étapes, centres
@@ -24,6 +25,7 @@ ses voyages, puis peut les partager avec les personnes de son choix.
 |---|---|---|
 | `VITE_SUPABASE_URL` | URL du projet | Supabase → Project Settings → API |
 | `VITE_SUPABASE_ANON_KEY` | Clé publique | Supabase → Project Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Suppression sécurisée du compte | Supabase → Project Settings → API |
 | `VITE_GOOGLE_MAPS_API_KEY` | Carte + recherche | Google Cloud → APIs & Services → Credentials |
 | `VITE_GOOGLE_MAPS_MAP_ID` | *(facultatif)* style de carte | Google Cloud → Map Management |
 | `OPENAI_API_KEY` | Génération des carnets et des fiches | platform.openai.com |
@@ -41,6 +43,10 @@ pour toute une liste d'un coup, chaque lieu coûtant une requête Places.
 `OPENAI_API_KEY` est volontairement **sans** préfixe `VITE_` : une variable
 `VITE_*` est embarquée dans le bundle envoyé au navigateur. Seules les
 fonctions serverless (`api/`) y ont accès.
+
+`SUPABASE_SERVICE_ROLE_KEY` est elle aussi réservée aux fonctions serverless :
+elle permet à `api/delete-account.js` de supprimer uniquement le compte dont
+le jeton Supabase a été vérifié. Ne l’exposez jamais dans une variable `VITE_*`.
 
 Les variables `VITE_*` sont lues au moment du build. Après les avoir modifiées
 sur Vercel, il faut relancer un déploiement.

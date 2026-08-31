@@ -9,7 +9,7 @@ import PlacePhoto from './components/PlacePhoto.jsx';
 import Auth from './components/Auth.jsx';
 import TripList from './components/TripList.jsx';
 import NewTripWizard from './components/NewTripWizard.jsx';
-import { getSession, onAuthChange, signOut, cleanAuthHash, isPasswordRecovery } from './lib/auth.js';
+import { deleteAccount as deleteAccountRequest, getSession, onAuthChange, signOut, cleanAuthHash, isPasswordRecovery } from './lib/auth.js';
 
 const VERDICTS = {
   oui:    { bg: "rgba(74,107,92,.14)",   color: "var(--jade)",       label: "OUI" },
@@ -21,6 +21,21 @@ const VERDICTS = {
 const gmaps = (p) => `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
 
 const LAST_TRIP_KEY = 'carnet-dernier-voyage';
+const HISTORY_TRIP_KEY = 'carnetTripId';
+
+function historyTrip(state = window.history.state) {
+  return state && typeof state === 'object' ? state[HISTORY_TRIP_KEY] || null : null;
+}
+
+function historyState(patch) {
+  return { ...(window.history.state || {}), ...patch };
+}
+
+function clearDeleteAccountQuery() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('delete-account');
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
 
 // ---------- Racine ----------
 export default function App() {
@@ -85,6 +100,11 @@ function Workspace({ session }) {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
+  const [confirmAccountDelete, setConfirmAccountDelete] = useState(
+    () => new URLSearchParams(window.location.search).get('delete-account') === '1'
+  );
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [accountDeleteError, setAccountDeleteError] = useState(null);
   // Renseigné quand la génération IA a échoué : le carnet existe, mais vide.
   const [genWarning, setGenWarning] = useState(null);
 
@@ -98,12 +118,36 @@ function Workspace({ session }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    if (!window.history.state) window.history.replaceState(historyState({ [HISTORY_TRIP_KEY]: null }), '');
+    const saved = historyTrip() || openId;
+    if (saved && !historyTrip()) window.history.pushState(historyState({ [HISTORY_TRIP_KEY]: saved }), '');
+
+    const onPopState = (event) => {
+      const tripId = historyTrip(event.state);
+      setOpenId(tripId);
+      setGenWarning(null);
+      try {
+        if (tripId) localStorage.setItem(LAST_TRIP_KEY, tripId);
+        else localStorage.removeItem(LAST_TRIP_KEY);
+      } catch { /* ignoré */ }
+      refresh();
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [openId, refresh]);
+
   const open = (trip) => {
+    if (historyTrip() !== trip.id) window.history.pushState(historyState({ [HISTORY_TRIP_KEY]: trip.id }), '');
     setOpenId(trip.id);
     try { localStorage.setItem(LAST_TRIP_KEY, trip.id); } catch { /* ignoré */ }
   };
 
   const back = () => {
+    if (historyTrip()) {
+      window.history.back();
+      return;
+    }
     setOpenId(null);
     setGenWarning(null);
     try { localStorage.removeItem(LAST_TRIP_KEY); } catch { /* ignoré */ }
@@ -186,6 +230,17 @@ function Workspace({ session }) {
     if (openId === trip.id) back();
   };
 
+  const removeAccount = async () => {
+    if (deletingAccount) return;
+    setDeletingAccount(true);
+    setAccountDeleteError(null);
+    const err = await deleteAccountRequest();
+    if (err) {
+      setAccountDeleteError(err);
+      setDeletingAccount(false);
+    }
+  };
+
   const openTrip = trips.find((t) => t.id === openId);
 
   if (openId && !openTrip && loading) return <Splash>Chargement…</Splash>;
@@ -196,6 +251,7 @@ function Workspace({ session }) {
         key={openTrip.id}
         trip={openTrip}
         email={session.user.email}
+        onDeleteAccount={() => { setAccountDeleteError(null); setConfirmAccountDelete(true); }}
         warning={genWarning}
         onDismissWarning={() => setGenWarning(null)}
         onBack={back}
@@ -213,6 +269,7 @@ function Workspace({ session }) {
         onOpen={open}
         onNew={() => { setCreateError(null); setWizard(true); }}
         onDelete={setConfirmDel}
+        onDeleteAccount={() => { setAccountDeleteError(null); setConfirmAccountDelete(true); }}
       />
       {wizard && (
         <NewTripWizard
@@ -231,12 +288,27 @@ function Workspace({ session }) {
           onNo={() => setConfirmDel(null)}
         />
       )}
+      {confirmAccountDelete && (
+        <Confirm
+          title="Supprimer mon compte ?"
+          message="Vos voyages, idées et partages seront supprimés définitivement. Cette action est irréversible."
+          confirmLabel={deletingAccount ? 'Suppression…' : 'Supprimer mon compte'}
+          error={accountDeleteError}
+          busy={deletingAccount}
+          onYes={removeAccount}
+          onNo={() => {
+            if (deletingAccount) return;
+            clearDeleteAccountQuery();
+            setConfirmAccountDelete(false);
+          }}
+        />
+      )}
     </>
   );
 }
 
 // ---------- Carnet d'un voyage ----------
-function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
+function Carnet({ trip, email, onDeleteAccount, warning, onDismissWarning, onBack }) {
   const cities = trip.cities?.length ? trip.cities : [{ id: 'etape', label: trip.title, native: '', note: '' }];
   const canWrite = trip.access === 'owner' || trip.access === 'write';
 
@@ -523,8 +595,11 @@ function Carnet({ trip, email, warning, onDismissWarning, onBack }) {
         </main>
 
         <footer className="px-6 py-6 border-t text-center text-[10px]" style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}>
-          {email}
-          <button onClick={signOut} className="ml-2 underline tracking-[.2em] uppercase">Se déconnecter</button>
+          <div>{email}</div>
+          <div className="mt-2 flex justify-center gap-3">
+            <button onClick={signOut} className="underline tracking-[.2em] uppercase">Se déconnecter</button>
+            <button onClick={onDeleteAccount} className="underline tracking-[.12em] uppercase" style={{ color: "var(--vermillion)" }}>Supprimer mon compte</button>
+          </div>
         </footer>
       </div>
 
@@ -721,7 +796,7 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 android-sheet"
       style={{ background: "rgba(27,34,48,.45)" }}>
       <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto sans"
         style={{ background: "var(--bg)", borderRadius: 12, border: "1px solid var(--line)" }}>
@@ -837,17 +912,18 @@ function Form({ init, cities, near, destination, onSave, onCancel }) {
 }
 
 // ---------- Confirmation ----------
-function Confirm({ title, message, confirmLabel, onYes, onNo }) {
+function Confirm({ title, message, confirmLabel, onYes, onNo, busy = false, error = null }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "rgba(27,34,48,.45)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 android-modal" style={{ background: "rgba(27,34,48,.45)" }}>
       <div className="w-full max-w-sm p-5 sans" style={{ background: "var(--bg)", borderRadius: 12, border: "1px solid var(--line)" }}>
         <h3 className="disp text-lg mb-2" style={{ fontWeight: 600 }}>{title}</h3>
         <p className="text-sm mb-5 leading-relaxed" style={{ color: "var(--ink-soft)" }}>{message}</p>
+        {error && <p className="text-xs mb-4" style={{ color: "var(--vermillion)" }}>{error}</p>}
         <div className="flex gap-2.5">
-          <button onClick={onNo} className="flex-1 py-2.5 rounded text-sm"
+          <button onClick={onNo} disabled={busy} className="flex-1 py-2.5 rounded text-sm"
             style={{ border: "1px solid var(--line)", color: "var(--ink)", fontWeight: 600 }}>Annuler</button>
-          <button onClick={onYes} className="flex-1 py-2.5 rounded text-sm"
-            style={{ background: "var(--vermillion)", color: "var(--paper)", fontWeight: 600 }}>
+          <button onClick={onYes} disabled={busy} className="flex-1 py-2.5 rounded text-sm"
+            style={{ background: "var(--vermillion)", color: "var(--paper)", fontWeight: 600, opacity: busy ? .65 : 1 }}>
             {confirmLabel}
           </button>
         </div>

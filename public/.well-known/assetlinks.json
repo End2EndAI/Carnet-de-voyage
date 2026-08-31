@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aivoyageplanner.app",
+      "sha256_cert_fingerprints": ["36:3A:0A:E2:F6:DB:CD:54:21:E3:83:29:BC:73:82:21:4C:4A:1D:78:72:E9:25:AB:65:10:5A:7D:FE:57:DE:50"]
+    }
+  }
+]

@@ -80,6 +80,22 @@ export async function signOut() {
   await supabase.auth.signOut();
 }
 
+/** Supprime le compte connecté et toutes les données qui y sont rattachées. */
+export async function deleteAccount() {
+  if (!hasSupabase) return NOT_CONFIGURED;
+  const session = await getSession();
+  if (!session?.access_token) return 'Votre session a expiré. Reconnectez-vous.';
+
+  const response = await fetch('/api/delete-account', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  }).catch(() => null);
+  const body = await response?.json().catch(() => ({}));
+  if (!response?.ok) return body?.error || 'La suppression du compte a échoué. Réessayez.';
+  await signOut();
+  return null;
+}
+
 /** Nettoie le fragment `#access_token=…` laissé par un lien de confirmation. */
 export function cleanAuthHash() {
   if (window.location.hash.includes('access_token')) {

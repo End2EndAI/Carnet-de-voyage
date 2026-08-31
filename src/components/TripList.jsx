@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { changeShare, formatDates, listShares, removeShare, shareTrip } from '../lib/trips.js';
 import { signOut } from '../lib/auth.js';
 
-export default function TripList({ trips, email, loading, error, onOpen, onNew, onDelete }) {
+export default function TripList({ trips, email, loading, error, onOpen, onNew, onDelete, onDeleteAccount }) {
   const [sharing, setSharing] = useState(null);
 
   return (
@@ -87,8 +87,11 @@ export default function TripList({ trips, email, loading, error, onOpen, onNew, 
         </div>
 
         <footer className="px-6 py-6 border-t text-center text-[10px]" style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
-          {email}
-          <button onClick={signOut} className="ml-2 underline tracking-[.2em] uppercase">Se déconnecter</button>
+          <div>{email}</div>
+          <div className="mt-2 flex justify-center gap-3">
+            <button onClick={signOut} className="underline tracking-[.2em] uppercase">Se déconnecter</button>
+            <button onClick={onDeleteAccount} className="underline tracking-[.12em] uppercase" style={{ color: 'var(--vermillion)' }}>Supprimer mon compte</button>
+          </div>
         </footer>
       </div>
       {sharing && <ShareTrip trip={sharing} onClose={() => setSharing(null)} />}
@@ -136,7 +139,7 @@ function ShareTrip({ trip, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(27,34,48,.45)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 android-modal" style={{ background: 'rgba(27,34,48,.45)' }}>
       <div role="dialog" aria-modal="true" aria-labelledby="share-title"
         className="w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sans"
         style={{ background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--line)' }}>

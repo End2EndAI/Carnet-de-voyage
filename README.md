@@ -14,6 +14,7 @@ ses voyages, puis peut les partager avec les personnes de son choix.
 - **Vraie carte Google Maps** avec un marqueur par lieu, cliquable
 - **Recherche d'adresse** (Google Places) : le nom et les coordonnées se remplissent seuls
 - **Complétion d'une fiche par IA** à partir du seul nom du lieu
+- **Photo du lieu** (Google Places), affichée sur la fiche et dans le formulaire
 - **Filtre par verdict** (oui / option / à voir / non), favoris, navigation par étape
 - **Données cloisonnées** par compte au niveau de la base (Row Level Security)
 
@@ -28,6 +29,14 @@ ses voyages, puis peut les partager avec les personnes de son choix.
 | `OPENAI_API_KEY` | Génération des carnets et des fiches | platform.openai.com |
 
 APIs Google à activer : **Maps JavaScript API** et **Places API (New)**.
+
+Les photos passent par la même clé que la carte : rien de plus à configurer.
+Seul l'identifiant Google du lieu (`place_id`) est conservé en base — les URL
+de photos expirent et Google en interdit la mise en cache, elles sont donc
+demandées au moment de l'affichage, puis gardées en mémoire le temps de la
+session. Une photo est cherchée quand on déplie une fiche, quand on choisit un
+lieu dans la recherche d'adresse, et après une génération par l'IA ; jamais
+pour toute une liste d'un coup, chaque lieu coûtant une requête Places.
 
 `OPENAI_API_KEY` est volontairement **sans** préfixe `VITE_` : une variable
 `VITE_*` est embarquée dans le bundle envoyé au navigateur. Seules les

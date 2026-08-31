@@ -5,6 +5,7 @@ import { hasSupabase } from './lib/supabase.js';
 import { hasMapsKey } from './lib/googleMaps.js';
 import GoogleMapView from './components/GoogleMapView.jsx';
 import PlaceSearch from './components/PlaceSearch.jsx';
+import PlacePhoto from './components/PlacePhoto.jsx';
 import Auth from './components/Auth.jsx';
 import TripList from './components/TripList.jsx';
 import NewTripWizard from './components/NewTripWizard.jsx';
@@ -343,6 +344,17 @@ function Carnet({ trip, email, accessToken, warning, onDismissWarning, onBack })
     });
   };
 
+  // L'identifiant Google trouvé en cherchant la photo est conservé sur la
+  // fiche : les ouvertures suivantes retrouvent l'image directement, sans
+  // repasser par une recherche par nom.
+  const rememberPlaceId = (idea, placeId) => {
+    if (!canWrite || !placeId || idea.placeId === placeId) return;
+    const next = { ...idea, placeId };
+    setIdeas(prev => prev.map(i => (i.id === idea.id ? next : i)));
+    // Écriture de confort : son échec ne vaut pas la peine d'alerter.
+    saveIdea(trip.id, next);
+  };
+
   const remove = (id) => {
     persist(ideas.filter(i => i.id !== id), () => removeIdea(id));
     setConfirmDel(null);
@@ -506,6 +518,8 @@ function Carnet({ trip, email, accessToken, warning, onDismissWarning, onBack })
             <div className="space-y-3">
               {listIdeas.map(i => (
                 <Card key={i.id} d={i} open={sel === i.id} canWrite={canWrite}
+                  cityLabel={activeCity.label} near={cityCenter}
+                  onPlaceId={(placeId) => rememberPlaceId(i, placeId)}
                   onToggle={() => setSel(sel === i.id ? null : i.id)}
                   onToggleFav={() => toggleFavori(i)}
                   onEdit={() => { setFormSession(s => s + 1); setEditing(i); }}
@@ -539,7 +553,7 @@ function Carnet({ trip, email, accessToken, warning, onDismissWarning, onBack })
 }
 
 // ---------- Fiche ----------
-function Card({ d, open, canWrite, onToggle, onToggleFav, onEdit, onDelete }) {
+function Card({ d, open, canWrite, cityLabel, near, onPlaceId, onToggle, onToggleFav, onEdit, onDelete }) {
   const v = VERDICTS[d.verdict] || VERDICTS.voir;
   return (
     <article className="rounded-lg overflow-hidden" style={{ background: "var(--paper)", border: "1px solid var(--line)" }}>
@@ -575,6 +589,10 @@ function Card({ d, open, canWrite, onToggle, onToggleFav, onEdit, onDelete }) {
 
       {open && (
         <div className="px-4 pb-4 fade" style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+          {/* Cherchée à l'ouverture de la fiche, pas au rendu de la liste :
+              une image par lieu affiché coûterait une requête Places chacune. */}
+          <PlacePhoto title={d.title} placeId={d.placeId} city={cityLabel} near={near}
+            onResolved={onPlaceId} />
           {d.note && <p className="text-xs italic disp mb-3" style={{ color: "var(--ink-soft)" }}>« {d.note} »</p>}
           {d.desc && <Field label="Descriptif">{d.desc}</Field>}
           {d.zone && <Field label="Quartier">{d.zone}</Field>}
@@ -627,16 +645,39 @@ function Form({ init, cities, near, destination, accessToken, onSave, onCancel }
     lat: init.lat ?? "", lng: init.lng ?? "",
   }).current;
   const [f, setF] = useState(initialState);
+  // Ce que la photo doit illustrer, figé au moment où on la demande : sans ça,
+  // chaque frappe dans le champ « Nom » relancerait une recherche facturée.
+  // Null tant qu'aucune photo n'est demandée — une fiche déjà rattachée à un
+  // lieu Google, elle, s'affiche d'emblée puisque sa photo est déjà connue.
+  const [photoOf, setPhotoOf] = useState(
+    init.placeId ? { title: init.title || "", placeId: init.placeId, city: init.city } : null
+  );
   const [aiState, setAiState] = useState("idle"); // idle | loading | error
   const [aiError, setAiError] = useState(null);
   const [aiResearched, setAiResearched] = useState(null); // null tant qu'aucune génération n'a eu lieu
   const [saving, setSaving] = useState(false);
-  const titleInput = useRef(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const valid = f.title.trim().length > 0;
 
+  // Affiche la photo du lieu. Jamais déclenché à la main : le formulaire
+  // l'appelle quand un lieu vient d'être choisi ou décrit par l'IA.
+  // `over` porte alors ce lieu, l'état du formulaire n'étant pas encore à jour.
+  // Un `placeId` explicitement vide écrase l'ancien : sinon un nouveau lieu
+  // hériterait de la photo du précédent.
+  const askPhoto = (over = {}) =>
+    setPhotoOf({
+      title: (over.title ?? f.title).trim(),
+      placeId: ('placeId' in over ? over.placeId : f.placeId) || null,
+      city: over.city ?? f.city,
+    });
+
   const resetFields = () => {
     setF(initialState);
+    setPhotoOf(
+      initialState.placeId
+        ? { title: initialState.title, placeId: initialState.placeId, city: initialState.city }
+        : null
+    );
     setAiState("idle");
     setAiError(null);
     setAiResearched(null);
@@ -670,6 +711,8 @@ function Form({ init, cities, near, destination, accessToken, onSave, onCancel }
       });
       setAiResearched(Boolean(data.researched));
       setAiState("idle");
+      // Le lieu vient d'être décrit : autant l'illustrer dans la foulée.
+      askPhoto();
     } catch (e) {
       setAiState("error");
       setAiError(e.message || "Échec de la génération.");
@@ -701,14 +744,19 @@ function Form({ init, cities, near, destination, accessToken, onSave, onCancel }
         </div>
 
         <div className="p-5 space-y-3.5">
-          <PlaceSearch near={near} onPick={(p) => setF(prev => ({
-            ...prev,
-            title: p.name || prev.title,
-            zone: p.address || prev.zone,
-            lat: p.lat ?? prev.lat,
-            lng: p.lng ?? prev.lng,
-          }))} />
-          <div><label htmlFor="idea-title">Nom *</label><input id="idea-title" ref={titleInput} value={f.title} onChange={set("title")} placeholder="Ex : Café Onion Seongsu, Duomo di Catania…" /></div>
+          <PlaceSearch near={near} onPick={(p) => {
+            setF(prev => ({
+              ...prev,
+              title: p.name || prev.title,
+              zone: p.address || prev.zone,
+              lat: p.lat ?? prev.lat,
+              lng: p.lng ?? prev.lng,
+              placeId: p.placeId ?? prev.placeId,
+            }));
+            // Le lieu est identifié : sa photo est déjà chargée, on l'affiche.
+            askPhoto({ title: p.name || f.title, placeId: p.placeId });
+          }} />
+          <div><label htmlFor="idea-title">Nom *</label><input id="idea-title" value={f.title} onChange={set("title")} placeholder="Ex : Café Onion Seongsu, Duomo di Catania…" /></div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <button type="button" onClick={generateWithAI} disabled={!f.title.trim() || aiState === "loading"}
               className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
@@ -738,6 +786,16 @@ function Form({ init, cities, near, destination, accessToken, onSave, onCancel }
                 ? "Champs proposés à partir d'une recherche web — à relire quand même."
                 : "Recherche web indisponible cette fois : champs génériques, à vérifier."}
             </p>
+          )}
+          {photoOf && (
+            <PlacePhoto
+              title={photoOf.title}
+              placeId={photoOf.placeId}
+              city={cities.find(c => c.id === photoOf.city)?.label || ""}
+              near={near}
+              showEmpty
+              onResolved={(placeId) => setF(prev => ({ ...prev, placeId }))}
+            />
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -71,6 +71,9 @@ create trigger trips_touch_updated_at
 -- `description` et `when_note` : « desc » et « when » sont réservés en SQL.
 -- `user_id` reste aligné sur le propriétaire du voyage par un trigger. Les
 -- droits des membres sont vérifiés via `trip_id` par les politiques RLS.
+-- `place_id` : identifiant Google du lieu, qui sert à retrouver sa photo. Seul
+-- l'identifiant est conservé — les URL de photos Google expirent et leur mise
+-- en cache est interdite, elles sont donc résolues à l'affichage.
 create table if not exists public.ideas (
   id          uuid primary key default gen_random_uuid(),
   trip_id     uuid not null references public.trips (id) on delete cascade,
@@ -88,11 +91,15 @@ create table if not exists public.ideas (
   when_note   text,
   lat         double precision,
   lng         double precision,
+  place_id    text,
   origin      text not null default 'perso',
   favori      boolean not null default false,
   position    integer not null default 0,
   updated_at  timestamptz not null default now()
 );
+
+-- Bases créées avant l'ajout des photos.
+alter table public.ideas add column if not exists place_id text;
 
 create index if not exists ideas_trip_idx on public.ideas (trip_id, position);
 

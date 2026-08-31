@@ -136,7 +136,7 @@ export default function NewTripWizard({ onCancel, onCreate, busy, error }) {
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="new-trip-title"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 android-sheet"
       style={{ background: 'rgba(27,34,48,.45)' }}>
       <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto sans"
         style={{ background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--line)' }}>

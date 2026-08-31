@@ -153,7 +153,7 @@ export default function GoogleMapView({ pts, sel, onSel }) {
   return (
     <div
       ref={holder}
-      className="w-full rounded-lg"
+      className="w-full rounded-lg map-view"
       style={{ height: 440, background: 'var(--paper)', border: '1px solid var(--line)' }}
     />
   );

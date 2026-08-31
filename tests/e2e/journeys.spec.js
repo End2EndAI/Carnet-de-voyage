@@ -30,7 +30,7 @@ test('creates, edits, favorites, filters, and deletes an idea', async ({ page })
   await page.getByPlaceholder('Ex : Café Onion Seongsu, Duomo di Catania…').fill('Duomo de Catane');
   await page.getByRole('button', { name: 'Enregistrer' }).click();
   await expect(page.getByRole('heading', { name: 'Duomo de Catane' })).toBeVisible();
-  await page.getByRole('button', { name: 'Supprimer' }).click();
+  await page.getByRole('button', { name: 'Supprimer', exact: true }).click();
   await page.getByRole('button', { name: 'Supprimer', exact: true }).last().click();
   await expect(page.getByRole('heading', { name: 'Duomo de Catane' })).toHaveCount(0);
 });

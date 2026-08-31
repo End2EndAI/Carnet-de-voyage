@@ -7,7 +7,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:schema": "vitest run tests/schema.test.js",
+    "test:rls": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/schema.sql >/dev/null && supabase test db supabase/tests/rls.sql",
+    "test:e2e": "playwright test",
+    "test:all": "npm run build && npm test && npm run test:schema && npm run test:rls && npm run test:e2e"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.0",
@@ -17,10 +23,17 @@
     "vercel": "^59.10.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.6",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "jsdom": "^29.1.1",
     "postcss": "^8.4.49",
+    "supabase": "^2.117.0-beta.6",
     "tailwindcss": "^3.4.17",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "vitest": "^4.1.11"
   }
 }

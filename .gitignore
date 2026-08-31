@@ -10,3 +10,5 @@ dist-ssr
 npm-debug.log*
 yarn-error.log*
 .env*
+test-results/
+playwright-report/

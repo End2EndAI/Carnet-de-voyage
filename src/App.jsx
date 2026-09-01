@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { loadIdeas, saveIdea, removeIdea, insertIdeas } from './lib/store.js';
-import { listTrips, createTrip, deleteTrip, formatDates, normalizeCities } from './lib/trips.js';
+import { listTrips, createTrip, updateTrip, deleteTrip, formatDates, normalizeCities } from './lib/trips.js';
 import { hasSupabase } from './lib/supabase.js';
 import { hasMapsKey } from './lib/googleMaps.js';
 import GoogleMapView from './components/GoogleMapView.jsx';
@@ -222,6 +222,10 @@ function Workspace({ session }) {
     open(trip);
   };
 
+  const applyTripUpdate = (updated) => {
+    setTrips((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+  };
+
   const removeTrip = async (trip) => {
     setConfirmDel(null);
     const err = await deleteTrip(trip.id);
@@ -256,6 +260,7 @@ function Workspace({ session }) {
         warning={genWarning}
         onDismissWarning={() => setGenWarning(null)}
         onBack={back}
+        onUpdateTrip={applyTripUpdate}
       />
     );
   }
@@ -309,7 +314,7 @@ function Workspace({ session }) {
 }
 
 // ---------- Carnet d'un voyage ----------
-function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissWarning, onBack }) {
+function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissWarning, onBack, onUpdateTrip }) {
   const cities = trip.cities?.length ? trip.cities : [{ id: 'etape', label: trip.title, native: '', note: '' }];
   const canWrite = trip.access === 'owner' || trip.access === 'write';
 
@@ -325,6 +330,9 @@ function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissW
   const [filter, setFilter] = useState("tous");
   const [favOnly, setFavOnly] = useState(false);
   const [errMsg, setErrMsg] = useState(null);
+  const [addingCity, setAddingCity] = useState(false);
+  const [cityError, setCityError] = useState(null);
+  const [savingCity, setSavingCity] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -433,6 +441,26 @@ function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissW
     if (sel === id) setSel(null);
   };
 
+  // Ajoute une étape : on repart des villes telles qu'enregistrées (pas du
+  // repli affiché quand le voyage n'en a aucune), pour ne pas transformer ce
+  // repli en vraie ville et casser les idées déjà rattachées à son id.
+  const addCity = async ({ label, native, note }) => {
+    setSavingCity(true);
+    setCityError(null);
+    const existing = (trip.cities || []).map((c) => ({ label: c.label, native: c.native, note: c.note }));
+    const nextCities = normalizeCities([...existing, { label, native, note }]);
+    const { trip: updated, error } = await updateTrip(trip.id, { cities: nextCities });
+    setSavingCity(false);
+    if (error || !updated) {
+      setCityError(error || "Impossible d'ajouter la ville.");
+      return;
+    }
+    onUpdateTrip?.(updated);
+    setCity(nextCities[nextCities.length - 1].id);
+    setSel(null);
+    setAddingCity(false);
+  };
+
   const activeCity = cities.find(c => c.id === city) || cities[0];
 
   return (
@@ -502,6 +530,13 @@ function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissW
                 </button>
               );
             })}
+            {trip.access === 'owner' && (
+              <button onClick={() => { setCityError(null); setAddingCity(true); }}
+                className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm"
+                style={{ background: "transparent", color: "var(--ink-soft)", border: "1px dashed var(--line)" }}>
+                <span className="disp" style={{ fontWeight: 500 }}>+ Ville</span>
+              </button>
+            )}
           </div>
           <div className="px-4 pb-2.5 flex items-center gap-2 flex-wrap">
             {["liste", "carte"].map(v => (
@@ -621,6 +656,14 @@ function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissW
           confirmLabel="Supprimer"
           onYes={() => remove(confirmDel.id)}
           onNo={() => setConfirmDel(null)}
+        />
+      )}
+      {trip.access === 'owner' && addingCity && (
+        <AddCityForm
+          busy={savingCity}
+          error={cityError}
+          onSave={addCity}
+          onCancel={() => setAddingCity(false)}
         />
       )}
     </div>
@@ -923,6 +966,54 @@ function Form({ init, cities, near, destination, accessToken, onSave, onCancel }
 }
 
 // ---------- Confirmation ----------
+function AddCityForm({ onSave, onCancel, busy = false, error = null }) {
+  const [label, setLabel] = useState("");
+  const [native, setNative] = useState("");
+  const [note, setNote] = useState("");
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!label.trim() || busy) return;
+    onSave({ label: label.trim(), native: native.trim(), note: note.trim() });
+  };
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="add-city-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-6 android-modal" style={{ background: "rgba(27,34,48,.45)" }}>
+      <form onSubmit={submit} className="w-full max-w-sm p-5 sans"
+        style={{ background: "var(--bg)", borderRadius: 12, border: "1px solid var(--line)" }}>
+        <h3 id="add-city-title" className="disp text-lg mb-4" style={{ fontWeight: 600 }}>Ajouter une ville</h3>
+        <div className="space-y-3">
+          <div>
+            <label htmlFor="add-city-label">Nom *</label>
+            <input id="add-city-label" autoFocus value={label} onChange={(e) => setLabel(e.target.value)}
+              placeholder="Ex : Kyoto" />
+          </div>
+          <div>
+            <label htmlFor="add-city-native">Nom local</label>
+            <input id="add-city-native" value={native} onChange={(e) => setNative(e.target.value)}
+              placeholder="Ex : 京都" />
+          </div>
+          <div>
+            <label htmlFor="add-city-note">Note</label>
+            <input id="add-city-note" value={note} onChange={(e) => setNote(e.target.value)}
+              placeholder="Ex : 3 jours" />
+          </div>
+        </div>
+        {error && <p className="text-xs mt-3" style={{ color: "var(--vermillion)" }}>{error}</p>}
+        <div className="flex gap-2.5 mt-5">
+          <button type="button" onClick={onCancel} disabled={busy} className="flex-1 py-2.5 rounded text-sm"
+            style={{ border: "1px solid var(--line)", color: "var(--ink)", fontWeight: 600 }}>Annuler</button>
+          <button type="submit" disabled={busy || !label.trim()} className="flex-1 py-2.5 rounded text-sm"
+            style={{ background: "var(--vermillion)", color: "var(--paper)", fontWeight: 600, opacity: (busy || !label.trim()) ? .65 : 1 }}>
+            {busy ? "Ajout…" : "Ajouter"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function Confirm({ title, message, confirmLabel, onYes, onNo, busy = false, error = null }) {
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="confirm-title" className="fixed inset-0 z-50 flex items-center justify-center p-6 android-modal" style={{ background: "rgba(27,34,48,.45)" }}>

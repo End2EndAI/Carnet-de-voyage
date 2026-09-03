@@ -5,8 +5,8 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /**
  * Client Supabase — null si les variables d'environnement ne sont pas
- * configurées. Dans ce cas l'application bascule automatiquement sur
- * localStorage (voir src/lib/store.js).
+ * configurées. Il n'y a pas de repli local : dans ce cas `App` affiche l'écran
+ * de configuration, sans compte ni carnet.
  */
 export const supabase = url && anonKey ? createClient(url, anonKey) : null;
 export const hasSupabase = Boolean(supabase);

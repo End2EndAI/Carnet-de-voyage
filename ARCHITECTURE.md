@@ -33,9 +33,10 @@ réelle ; ne déplacez pas ces règles uniquement dans React.
 - `src/lib/` est la frontière avec les services externes. Les composants ne
   construisent pas de requêtes Supabase directement.
 - `api/` contient les fonctions serverless Vercel, séparées du bundle Vite.
-- `supabase/schema.sql` est la source de vérité du schéma, des fonctions SQL,
-  des triggers et des politiques RLS. Il est idempotent et inclut la migration
-  de l'ancienne table d'idées.
+- `supabase/migrations/` est la source de vérité du schéma, des fonctions SQL,
+  des triggers et des politiques RLS ; c'est ce que `supabase db push` applique.
+  `supabase/schema.sql` documente l'ancien déploiement et sa reprise de
+  données : il ne doit pas être rejoué sur une base déjà migrée.
 
 Tailwind fournit les utilitaires CSS ; l'identité visuelle et les styles de
 base sont dans `src/index.css`. Il n'y a pas de routeur : l'état affiché est
@@ -117,14 +118,18 @@ front `desc` et `when`; ce mapping est centralisé dans `src/lib/store.js`.
 | --- | --- | --- | --- |
 | `POST /api/generate-trip` | `answers` du wizard | voyage, étapes et idées suggérées | le client crée un voyage vide d'idées |
 | `POST /api/generate-idea` | nom, lieu, destination et étape | champs de fiche suggérés | le formulaire reste éditable manuellement |
+| `DELETE /api/delete-account` | jeton Supabase du compte | suppression du compte et de ses données | l'interface affiche l'erreur, rien n'est supprimé |
 
-Les deux handlers refusent les méthodes autres que `POST`, valident leur
-entrée minimale et lisent `OPENAI_API_KEY` côté serveur. `generate-trip` est
-limité à 60 secondes par Vercel et plafonne à cinq étapes, quatre idées par
-étape. Les routes ne vérifient actuellement pas une session Supabase : elles
-protègent la clé OpenAI, mais peuvent être appelées publiquement et donc
-consommer du quota. Ajoutez authentification et limitation de débit avant une
-exposition publique importante.
+Les trois handlers refusent les autres méthodes HTTP, valident leur entrée
+minimale et lisent leurs clés côté serveur. Les deux routes de génération
+exigent un jeton Supabase valide (`requireUser` dans `api/auth.js`) avant de
+dépenser du quota OpenAI ; `delete-account` vérifie le même jeton, puis n'agit
+que sur le compte qu'il identifie, avec la clé de service.
+
+`generate-trip` est limité à 60 secondes par Vercel et plafonne à cinq étapes,
+quatre idées par étape. L'authentification empêche un appel anonyme, pas un
+compte qui boucle : la limitation de débit reste une règle de pare-feu Vercel,
+décrite dans [OPERATIONS.md](OPERATIONS.md).
 
 ## Configuration, exécution et déploiement
 
@@ -156,11 +161,13 @@ un nouveau déploiement.
 
 ## Points d'attention
 
-- Le commentaire de `src/lib/supabase.js` mentionne un repli vers
-  `localStorage`, mais le code ne le fait pas : sans Supabase, `App` affiche
-  l'écran de configuration.
-- `updateTrip` existe dans `src/lib/trips.js` mais n'est pas utilisé par
-  l'interface actuelle.
-- Il n'y a pas de suite de tests automatisés. Avant une modification, le
-  contrôle minimal existant est `npm run build`; pour les droits, testez aussi
-  propriétaire, membre lecture et membre écriture dans Supabase.
+- Sans variables Supabase, il n'y a pas de repli local : `App` affiche l'écran
+  de configuration et rien n'est lisible ni enregistrable.
+- Les tests couvrent les composants, les fonctions serverless, le contrat du
+  schéma, les politiques RLS sur une base locale et les parcours navigateur.
+  `npm run test:all` les enchaîne, précédé du build et de l'audit des
+  dépendances de production ; `npm run test:rls` demande Docker.
+- Les pages légales (`public/confidentialite.html`, `public/conditions.html`)
+  sont servies hors de la SPA, par des réécritures placées avant le
+  catch-all de `vercel.json`. Elles doivent rester lisibles sans compte : leurs
+  URL sont celles déclarées au Play Store.

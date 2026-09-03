@@ -49,8 +49,28 @@ cd android && ./gradlew bundleRelease
 # → app/build/outputs/bundle/release/app-release.aab
 ```
 
-Incrémentez `versionCode` (et `versionName`) dans `android/app/build.gradle`
-avant chaque envoi : un `versionCode` n'est acceptable qu'une seule fois.
+Un `versionCode` n'est acceptable qu'une seule fois par envoi. Il vaut 1 par
+défaut ; incrémentez-le à chaque publication, sans éditer le fichier :
+
+```bash
+./gradlew bundleRelease -PcarnetVersionCode=2 -PcarnetVersionName=1.1.0
+```
+
+Les variables `CARNET_VERSION_CODE` et `CARNET_VERSION_NAME` font la même
+chose depuis l'environnement.
+
+### Les icônes
+
+`public/icon.svg` est l'icône « any » (coins arrondis) ;
+`public/icon-maskable.svg` est la variante maskable, fond plein cadre et motif
+dans la zone sûre, dont dérivent `public/icon-maskable-512.png` et les
+`android/app/src/main/res/mipmap-*/ic_maskable.png`. Une icône maskable à coins
+transparents laisse passer le fond du lanceur sous un masque adaptatif : gardez
+les deux séparées si vous retouchez le dessin.
+
+Attention si vous relancez `bubblewrap update` : il régénère le projet Android
+depuis `twa-manifest.json` et écrase `strings.xml`. Revérifiez alors les trois
+lignes du tableau ci-dessus — `npm test` échoue si elles divergent.
 
 ## 3. Le point d'ordre à ne pas rater : l'empreinte
 

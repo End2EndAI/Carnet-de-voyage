@@ -11,16 +11,16 @@
   "navigationDividerColor": "#000000",
   "navigationDividerColorDark": "#000000",
   "backgroundColor": "#F2EDE3",
-  "enableNotifications": true,
+  "enableNotifications": false,
   "startUrl": "/",
   "iconUrl": "https://ai-simple-voyage-planner.vercel.app/icon-512.png",
-  "maskableIconUrl": "https://ai-simple-voyage-planner.vercel.app/icon-512.png",
+  "maskableIconUrl": "https://ai-simple-voyage-planner.vercel.app/icon-maskable-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./carnet-upload.keystore",
     "alias": "upload"
   },
-  "appVersionName": "1",
+  "appVersionName": "1.0.0",
   "appVersionCode": 1,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
@@ -43,5 +43,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1"
+  "appVersion": "1.0.0"
 }

@@ -68,3 +68,23 @@ test('deletes a trip and its ideas', async ({ page }) => {
   expect(state.trips).toHaveLength(0);
   expect(state.ideas).toHaveLength(0);
 });
+
+test('offers a report link on AI suggestions, and the legal pages without an account', async ({ page }) => {
+  await fakeBackend(page, { trips: [trip()], ideas: [
+    { id: 'idea-1', trip_id: 'trip-1', city: 'catane', title: 'Duomo', verdict: 'voir', origin: 'suggestion', position: 0 },
+    { id: 'idea-2', trip_id: 'trip-1', city: 'catane', title: 'Mon adresse', verdict: 'voir', origin: 'perso', position: 1 },
+  ] });
+
+  // Les pages légales doivent être atteignables sans compte.
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Confidentialité' })).toBeVisible();
+
+  // La politique Play sur l'IA générative exige un signalement dans l'app,
+  // et seulement sur ce que l'IA a produit.
+  await signIn(page);
+  await page.getByRole('button', { name: /Sicile/ }).first().click();
+  await page.getByRole('button', { name: 'Duomo' }).click();
+  await expect(page.getByRole('link', { name: 'Signaler' })).toHaveAttribute('href', /^mailto:.*idea-1/);
+  await page.getByRole('button', { name: 'Mon adresse' }).click();
+  await expect(page.getByRole('link', { name: 'Signaler' })).toHaveCount(0);
+});

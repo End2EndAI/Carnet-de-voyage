@@ -50,6 +50,18 @@ def twaManifest = [
     orientation: 'default',
 ]
 
+// Secrets de signature — jamais dans le dépôt. Renseignez android/keystore.properties
+// (gitignoré, voir keystore.properties.example) ou, en CI, les variables
+// d'environnement ANDROID_KEYSTORE_FILE / _PASSWORD / ANDROID_KEY_ALIAS / _PASSWORD.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def keystoreSetting = { String key, String envName ->
+    keystoreProperties.getProperty(key) ?: System.getenv(envName)
+}
+
 android {
     compileSdkVersion 36
     namespace "com.aivoyageplanner.app"
@@ -150,9 +162,23 @@ android {
 
         
     }
+    signingConfigs {
+        release {
+            def storePath = keystoreSetting('storeFile', 'ANDROID_KEYSTORE_FILE')
+            // Sans keystore configuré, la config reste vide : les tâches de debug
+            // continuent de fonctionner, seule la release refusera de se signer.
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword keystoreSetting('storePassword', 'ANDROID_KEYSTORE_PASSWORD')
+                keyAlias keystoreSetting('keyAlias', 'ANDROID_KEY_ALIAS')
+                keyPassword keystoreSetting('keyPassword', 'ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled true
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {

@@ -9,6 +9,8 @@ import PlacePhoto from './components/PlacePhoto.jsx';
 import Auth from './components/Auth.jsx';
 import TripList from './components/TripList.jsx';
 import NewTripWizard from './components/NewTripWizard.jsx';
+import LegalLinks from './components/LegalLinks.jsx';
+import { reportIdeaUrl } from './lib/legal.js';
 import { deleteAccount as deleteAccountRequest, getSession, onAuthChange, signOut, cleanAuthHash, isPasswordRecovery } from './lib/auth.js';
 
 const VERDICTS = {
@@ -625,7 +627,7 @@ function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissW
             <div className="space-y-3">
               {listIdeas.map(i => (
                 <Card key={i.id} d={i} open={sel === i.id} canWrite={canWrite}
-                  cityLabel={activeCity.label} near={cityCenter}
+                  cityLabel={activeCity.label} tripTitle={trip.title} near={cityCenter}
                   onPlaceId={(placeId) => rememberPlaceId(i, placeId)}
                   onToggle={() => setSel(sel === i.id ? null : i.id)}
                   onToggleFav={() => toggleFavori(i)}
@@ -642,6 +644,7 @@ function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissW
             <button onClick={signOut} className="underline tracking-[.2em] uppercase">Se déconnecter</button>
             <button onClick={onDeleteAccount} className="underline tracking-[.12em] uppercase" style={{ color: "var(--vermillion)" }}>Supprimer mon compte</button>
           </div>
+          <LegalLinks className="mt-2" />
         </footer>
       </div>
 
@@ -671,7 +674,7 @@ function Carnet({ trip, email, accessToken, onDeleteAccount, warning, onDismissW
 }
 
 // ---------- Fiche ----------
-function Card({ d, open, canWrite, cityLabel, near, onPlaceId, onToggle, onToggleFav, onEdit, onDelete }) {
+function Card({ d, open, canWrite, cityLabel, tripTitle, near, onPlaceId, onToggle, onToggleFav, onEdit, onDelete }) {
   const v = VERDICTS[d.verdict] || VERDICTS.voir;
   return (
     <article className="rounded-lg overflow-hidden" style={{ background: "var(--paper)", border: "1px solid var(--line)" }}>
@@ -730,6 +733,12 @@ function Card({ d, open, canWrite, cityLabel, near, onPlaceId, onToggle, onToggl
                 <button onClick={onDelete} className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide"
                   style={{ border: "1px solid var(--vermillion)", color: "var(--vermillion)", fontWeight: 600 }}>Supprimer</button>
               </>
+            )}
+            {d.origin === "suggestion" && (
+              <a href={reportIdeaUrl(d, tripTitle)}
+                className="px-3 py-1.5 rounded text-[11px] uppercase tracking-wide underline"
+                style={{ color: "var(--ink-soft)", fontWeight: 600 }}
+                title="Signaler cette suggestion générée par IA">Signaler</a>
             )}
             {Number.isFinite(d.lat) && Number.isFinite(d.lng) && (
               <a href={gmaps(d)} target="_blank" rel="noopener noreferrer"

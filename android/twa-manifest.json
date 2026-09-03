@@ -17,8 +17,8 @@
   "maskableIconUrl": "https://ai-simple-voyage-planner.vercel.app/icon-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
-    "path": "/Users/louis.fontaine@akeneo.com/orca/workspaces/Carnet-de-voyage/android-twa/android/carnet-debug.keystore",
-    "alias": "debug"
+    "path": "./carnet-upload.keystore",
+    "alias": "upload"
   },
   "appVersionName": "1",
   "appVersionCode": 1,

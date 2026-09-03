@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { signUp, signIn, resetPassword, updatePassword } from '../lib/auth.js';
+import LegalLinks from './LegalLinks.jsx';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -150,6 +151,8 @@ export default function Auth({ reset = false, onResetDone }) {
             <span>En créant un compte, vos carnets ne sont visibles que par vous.</span>
           )}
         </div>}
+
+        <LegalLinks className="mt-6" />
       </div>
     </div>
   );

@@ -6,3 +6,4 @@ local.properties
 *.apk
 *.aab
 *.idsig
+keystore.properties

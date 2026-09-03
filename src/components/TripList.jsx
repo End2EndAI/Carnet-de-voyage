@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import LegalLinks from './LegalLinks.jsx';
 import { changeShare, formatDates, listShares, removeShare, shareTrip } from '../lib/trips.js';
 import { signOut } from '../lib/auth.js';
 
@@ -92,6 +93,7 @@ export default function TripList({ trips, email, loading, error, onOpen, onNew, 
             <button onClick={signOut} className="underline tracking-[.2em] uppercase">Se déconnecter</button>
             <button onClick={onDeleteAccount} className="underline tracking-[.12em] uppercase" style={{ color: 'var(--vermillion)' }}>Supprimer mon compte</button>
           </div>
+          <LegalLinks className="mt-2" />
         </footer>
       </div>
       {sharing && <ShareTrip trip={sharing} onClose={() => setSharing(null)} />}

@@ -142,3 +142,15 @@ Build : `npm run build` · Dossier de sortie : `dist`.
 
 Les opérations de production (SMTP, pare-feu, alertes et reprise) sont décrites
 dans [OPERATIONS.md](OPERATIONS.md).
+
+## Application Android
+
+`android/` contient une TWA : l'app Android ouvre le site déployé, elle
+n'embarque pas de code. La procédure de signature, de publication et la liste
+des éléments à fournir au Play Console sont dans
+[PLAY_STORE.md](PLAY_STORE.md).
+
+Les pages légales — [`/confidentialite`](public/confidentialite.html) et
+[`/conditions`](public/conditions.html) — sont des fichiers statiques de
+`public/`, servis avant la réécriture SPA pour rester lisibles sans compte.
+Leurs URL sont demandées par le Play Console.

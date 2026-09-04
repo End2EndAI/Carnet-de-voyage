@@ -53,9 +53,9 @@ def twaManifest = [
 ]
 
 def appVersionCode = (project.findProperty('carnetVersionCode')
-        ?: System.getenv('CARNET_VERSION_CODE') ?: '1') as Integer
+        ?: System.getenv('CARNET_VERSION_CODE') ?: '2') as Integer
 def appVersionName = project.findProperty('carnetVersionName')
-        ?: System.getenv('CARNET_VERSION_NAME') ?: '1.0.0'
+        ?: System.getenv('CARNET_VERSION_NAME') ?: '1.1.0'
 
 // Secrets de signature — jamais dans le dépôt. Renseignez android/keystore.properties
 // (gitignoré, voir keystore.properties.example) ou, en CI, les variables
@@ -78,7 +78,7 @@ android {
         targetSdkVersion 36
         // Un versionCode n'est acceptable qu'une fois par envoi au Play Store.
         // Surchargeables sans éditer ce fichier :
-        //   ./gradlew bundleRelease -PcarnetVersionCode=2 -PcarnetVersionName=1.1.0
+        //   ./gradlew bundleRelease -PcarnetVersionCode=3 -PcarnetVersionName=1.1.1
         versionCode appVersionCode
         versionName appVersionName
 
@@ -170,7 +170,7 @@ android {
         resValue "bool", "enableSiteSettingsShortcut", twaManifest.enableSiteSettingsShortcut
         resValue "string", "orientation", twaManifest.orientation
 
-        
+
     }
     signingConfigs {
         release {
@@ -243,6 +243,8 @@ repositories {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    
+        implementation 'com.google.androidbrowserhelper:locationdelegation:1.1.2'
     
         implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
     

@@ -4,7 +4,10 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.aivoyageplanner.app",
-      "sha256_cert_fingerprints": ["36:3A:0A:E2:F6:DB:CD:54:21:E3:83:29:BC:73:82:21:4C:4A:1D:78:72:E9:25:AB:65:10:5A:7D:FE:57:DE:50"]
+      "sha256_cert_fingerprints": [
+        "36:3A:0A:E2:F6:DB:CD:54:21:E3:83:29:BC:73:82:21:4C:4A:1D:78:72:E9:25:AB:65:10:5A:7D:FE:57:DE:50",
+        "14:0B:31:C7:22:14:08:12:2A:C3:2D:00:7B:5E:1D:CF:75:00:51:50:08:94:E5:FB:0F:43:13:6D:59:6E:97:1A"
+      ]
     }
   }
 ]

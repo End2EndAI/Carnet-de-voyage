@@ -26,7 +26,11 @@
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://ai-simple-voyage-planner.vercel.app/manifest.webmanifest",
   "fallbackType": "customtabs",
-  "features": {},
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
   "alphaDependencies": {
     "enabled": false
   },

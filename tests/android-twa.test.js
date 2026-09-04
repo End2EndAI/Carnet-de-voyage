@@ -72,3 +72,31 @@ describe('notification delegation', () => {
     expect(androidManifest).not.toContain('POST_NOTIFICATIONS');
   });
 });
+
+describe('location delegation', () => {
+  // La carte affiche la position de l'appareil. Dans une TWA, Chrome ne la
+  // donne à la page que si l'application Android délègue la permission : sans
+  // cela, la demande est refusée sans que rien ne le dise. Les quatre
+  // déclarations ci-dessous vont ensemble — il en manque une, la position est
+  // refusée sur Android alors qu'elle marche sur le web.
+  const packagePath = twaManifest.packageId.replace(/\./g, '/');
+  const androidManifest = read('android/app/src/main/AndroidManifest.xml');
+  const delegationService = read(`android/app/src/main/java/${packagePath}/DelegationService.java`);
+
+  it('stays declared everywhere the Android build reads it', () => {
+    expect(twaManifest.features?.locationDelegation?.enabled).toBe(true);
+    expect(gradle).toContain('com.google.androidbrowserhelper:locationdelegation');
+    expect(androidManifest).toContain(
+      'com.google.androidbrowserhelper.locationdelegation.PermissionRequestActivity',
+    );
+    expect(delegationService).toContain('LocationDelegationExtraCommandHandler');
+    expect(delegationService)
+      .toContain('registerExtraCommandHandler(new LocationDelegationExtraCommandHandler());');
+  });
+
+  // La permission Android vient du manifeste de la bibliothèque, fusionné à la
+  // compilation : la déclarer ici en plus ne servirait qu'à la figer.
+  it('leaves the permission to the delegation library', () => {
+    expect(androidManifest).not.toContain('ACCESS_FINE_LOCATION');
+  });
+});

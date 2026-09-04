@@ -1,5 +1,7 @@
 package com.aivoyageplanner.app;
 
+import com.google.androidbrowserhelper.locationdelegation.LocationDelegationExtraCommandHandler;
+
 
 
 public class DelegationService extends
@@ -8,6 +10,8 @@ public class DelegationService extends
     public void onCreate() {
         super.onCreate();
 
+        
+            registerExtraCommandHandler(new LocationDelegationExtraCommandHandler());
         
     }
 }

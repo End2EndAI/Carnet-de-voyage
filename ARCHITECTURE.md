@@ -163,9 +163,10 @@ un nouveau déploiement.
 - Toucher à la localisation : `lib/geolocation.js` et `GoogleMapView`, plus
   l'en-tête `Permissions-Policy` de `vercel.json` — un navigateur refuse la
   position sans même la demander si l'en-tête ne l'autorise pas, et cela ne se
-  voit qu'en production. Si la position venait à être enregistrée ou transmise,
-  la politique de confidentialité et la déclaration Play Console changeraient
-  avec le code.
+  voit qu'en production. Sur Android, la position passe en plus par la
+  délégation Bubblewrap du projet TWA (voir [PLAY_STORE.md](PLAY_STORE.md)). Si
+  la position venait à être enregistrée ou transmise, la politique de
+  confidentialité et la déclaration Play Console changeraient avec le code.
 - Changer les prompts ou modèles : uniquement dans `api/`, jamais dans une
   variable `VITE_*` ni dans le client.
 

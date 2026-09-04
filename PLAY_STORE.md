@@ -111,22 +111,29 @@ celle de votre clé d'upload — et elle n'est connue qu'après le premier envoi
 
 ## La localisation dans l'application Android
 
-Le bouton « ma position » de la carte fonctionne sur le web. Dans la TWA, la
-page n'obtient la position que si l'application Android porte elle-même la
-permission : sans cela, Chrome refuse la demande et la carte affiche « Localisation
-refusée » — le reste de l'application n'en souffre pas. Pour l'activer, il faut
-la délégation de position de Bubblewrap, qui touche au projet Android généré :
+Le bouton « ma position » de la carte a besoin d'une permission Android : dans
+une TWA, Chrome ne donne la position à la page que si l'application la délègue.
+La délégation est activée (`features.locationDelegation` dans
+`android/twa-manifest.json`) et repose sur quatre déclarations solidaires, que
+`tests/android-twa.test.js` vérifie ensemble :
 
-- `android/twa-manifest.json` : `"features": { "locationDelegation": { "enabled": true } }`,
-  puis `bubblewrap update` pour régénérer le projet ;
-- il en résulte la permission `ACCESS_FINE_LOCATION` dans le manifeste, la
-  dépendance `com.google.androidbrowserhelper:locationdelegation` et son
-  gestionnaire enregistré dans `DelegationService`.
+| Où | Quoi |
+| --- | --- |
+| `android/twa-manifest.json` | `features.locationDelegation.enabled` — ce que relit `bubblewrap update` |
+| `android/app/build.gradle` | `com.google.androidbrowserhelper:locationdelegation` |
+| `AndroidManifest.xml` | l'activité `locationdelegation.PermissionRequestActivity` |
+| `DelegationService.java` | `registerExtraCommandHandler(new LocationDelegationExtraCommandHandler())` |
 
-Ce changement demande une nouvelle version publiée **et** une déclaration de
-position dans le formulaire « Sécurité des données » du Play Console : traitée
-sur l'appareil, jamais envoyée. Tant qu'il n'est pas fait, la fonction est une
-fonction du site, pas de l'application Android.
+La permission `ACCESS_FINE_LOCATION` n'est pas écrite dans notre manifeste :
+elle vient de celui de la bibliothèque, fusionné à la compilation. Elle
+apparaîtra donc dans la liste des autorisations de la fiche Play, et Android la
+demandera à l'utilisateur au premier appui sur le bouton.
+
+Côté Play Console, le formulaire « Sécurité des données » ne change pas : la
+position est traitée sur l'appareil et n'est envoyée nulle part, elle n'est donc
+pas « collectée » au sens du formulaire. Il faut en revanche republier
+l'application : la délégation est du code natif, elle n'arrive pas par une mise
+à jour du site.
 
 ## Ce que la TWA n'exige pas
 

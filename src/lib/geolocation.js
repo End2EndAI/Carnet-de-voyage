@@ -30,12 +30,30 @@ export function watchPosition(onPosition, onError) {
     return () => {};
   }
 
-  const id = navigator.geolocation.watchPosition(
-    ({ coords }) =>
-      onPosition({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy }),
-    (err) => onError(geolocationMessage(err)),
-    OPTIONS,
-  );
+  let id;
+  const watch = (options, onFailure) => {
+    id = navigator.geolocation.watchPosition(
+      ({ coords }) =>
+        onPosition({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy }),
+      onFailure,
+      options,
+    );
+  };
+
+  // Dans la TWA Android, la haute précision demande un point GPS : sans vue du
+  // ciel le fournisseur se déclare indisponible aussitôt et coupe le suivi
+  // (POSITION_UNAVAILABLE). Un second essai en précision réduite passe par le
+  // Wi-Fi et les antennes, ce qui répond à l'intérieur.
+  watch(OPTIONS, (err) => {
+    if (err?.code !== 2) {
+      onError(geolocationMessage(err));
+      return;
+    }
+    navigator.geolocation.clearWatch(id);
+    watch({ ...OPTIONS, enableHighAccuracy: false }, (retryErr) =>
+      onError(geolocationMessage(retryErr)),
+    );
+  });
 
   return () => navigator.geolocation.clearWatch(id);
 }

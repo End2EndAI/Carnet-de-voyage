@@ -123,6 +123,44 @@ describe('localisation sur la carte', () => {
     expect(created.markers).toHaveLength(1);
   });
 
+  // La TWA Android coupe le suivi dès que le GPS se déclare indisponible, ce
+  // qui arrive tout de suite à l'intérieur. Sans ce second essai en précision
+  // réduite, la position ne marche que dehors.
+  it('retries without high accuracy when no signal is reported', async () => {
+    const user = userEvent.setup();
+    geolocation.watchPosition = vi.fn().mockReturnValueOnce(7).mockReturnValueOnce(8);
+    const { button } = await renderMap();
+    await user.click(button);
+
+    expect(geolocation.watchPosition.mock.calls[0][2].enableHighAccuracy).toBe(true);
+    geolocation.watchPosition.mock.calls[0][1]({ code: 2 });
+
+    expect(geolocation.clearWatch).toHaveBeenCalledWith(7);
+    expect(geolocation.watchPosition).toHaveBeenCalledTimes(2);
+    expect(geolocation.watchPosition.mock.calls[1][2].enableHighAccuracy).toBe(false);
+    // Le second essai n'a pas encore échoué : rien à annoncer à l'écran.
+    expect(screen.queryByText(/Position indisponible/)).not.toBeInTheDocument();
+
+    // Une position au second essai s'affiche comme n'importe quelle autre.
+    geolocation.watchPosition.mock.calls[1][0](fix(45.06, 7.69, 80));
+    await waitFor(() => expect(created.markers).toHaveLength(2));
+    expect(created.markers.at(-1).position).toEqual({ lat: 45.06, lng: 7.69 });
+  });
+
+  it('gives up with a message when the retry fails too', async () => {
+    const user = userEvent.setup();
+    geolocation.watchPosition = vi.fn().mockReturnValueOnce(7).mockReturnValueOnce(8);
+    const { button } = await renderMap();
+    await user.click(button);
+
+    geolocation.watchPosition.mock.calls[0][1]({ code: 2 });
+    geolocation.watchPosition.mock.calls[1][1]({ code: 2 });
+
+    expect(await screen.findByText(/Position indisponible/)).toBeInTheDocument();
+    expect(geolocation.clearWatch).toHaveBeenCalledWith(8);
+    expect(created.markers).toHaveLength(1);
+  });
+
   it('hides the device again when the tracking is switched off', async () => {
     const user = userEvent.setup();
     const { button } = await renderMap();

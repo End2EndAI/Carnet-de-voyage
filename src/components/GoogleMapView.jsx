@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { loadGoogleMaps, hasMapsKey, MAP_ID } from '../lib/googleMaps.js';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { loadGoogleMaps, hasMapsKey, MAP_ID, onMapsAuthFailure } from '../lib/googleMaps.js';
+import { watchPosition } from '../lib/geolocation.js';
 
 // Une couleur par étape, tirée de la palette du carnet. L'identifiant de
 // l'étape choisit la teinte : même étape, même couleur d'une visite à l'autre.
@@ -27,6 +28,21 @@ function makePin(index, color, selected) {
   return el;
 }
 
+// La position de l'appareil se distingue des étapes par sa forme — un point
+// plein sans numéro — autant que par sa couleur.
+const ME_COLOR = '#47597E';
+
+function makeMeDot() {
+  const el = document.createElement('div');
+  el.title = 'Ma position';
+  el.style.cssText = `
+    width:16px;height:16px;border-radius:50%;
+    background:${ME_COLOR};border:3px solid #FAF6EE;
+    box-shadow:0 1px 5px rgba(27,34,48,.45);
+  `;
+  return el;
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -49,16 +65,31 @@ export default function GoogleMapView({ pts, sel, onSel }) {
   const map = useRef(null);
   const markers = useRef(new Map());
   const infoWindow = useRef(null);
+  const me = useRef({ stop: null, marker: null, halo: null, centered: false });
   const [error, setError] = useState(null);
   const [ready, setReady] = useState(false);
+  const [myPos, setMyPos] = useState(null);
+  const [tracking, setTracking] = useState(false);
+  const [geoError, setGeoError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     loadGoogleMaps()
       .then(() => !cancelled && setReady(true))
       .catch((e) => !cancelled && setError(e.message));
+    // Clé refusée : Google remplace la carte par son panneau d'erreur en gris,
+    // qui ne dit pas quoi corriger. On prend la main sur l'explication.
+    const unsubscribe = onMapsAuthFailure(() => {
+      if (cancelled) return;
+      setError(
+        'Carte indisponible : Google a refusé la clé pour ce domaine. À vérifier dans '
+        + 'Google Cloud : les restrictions de la clé, l’activation de Maps JavaScript '
+        + 'API, et la facturation du projet.',
+      );
+    });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
@@ -137,6 +168,96 @@ export default function GoogleMapView({ pts, sel, onSel }) {
     }
   }, [sel, ready]);
 
+  // Suivi de la position : le point se déplace avec l'utilisateur tant que le
+  // suivi est actif, ce qui sert surtout sur place, en marchant.
+  const stopTracking = useCallback(() => {
+    me.current.stop?.();
+    me.current.stop = null;
+    me.current.centered = false;
+    setTracking(false);
+    setMyPos(null);
+  }, []);
+
+  // À la fermeture de la carte, la géolocalisation ne doit pas continuer à
+  // tourner en fond : elle consomme la batterie pour rien.
+  useEffect(() => stopTracking, [stopTracking]);
+
+  // Carte remplacée par un message d'erreur : le bouton d'arrêt disparaît avec
+  // elle, le suivi ne doit pas lui survivre.
+  useEffect(() => {
+    if (error) stopTracking();
+  }, [error, stopTracking]);
+
+  const toggleTracking = () => {
+    if (tracking) {
+      stopTracking();
+      setGeoError(null);
+      return;
+    }
+    setGeoError(null);
+    setTracking(true);
+    me.current.centered = false;
+    me.current.stop = watchPosition(setMyPos, (message) => {
+      setGeoError(message);
+      stopTracking();
+    });
+  };
+
+  // Point de position + cercle de précision, recentrés au premier relevé.
+  useEffect(() => {
+    if (!ready || !map.current) return;
+    const maps = window.google.maps;
+
+    if (!myPos) {
+      if (me.current.marker) me.current.marker.map = null;
+      me.current.halo?.setMap(null);
+      me.current.marker = null;
+      me.current.halo = null;
+      return;
+    }
+
+    const position = { lat: myPos.lat, lng: myPos.lng };
+    if (me.current.marker) {
+      me.current.marker.position = position;
+    } else {
+      me.current.marker = new maps.marker.AdvancedMarkerElement({
+        map: map.current,
+        position,
+        title: 'Ma position',
+        content: makeMeDot(),
+        zIndex: 1000,
+      });
+    }
+
+    // Le cercle dit ce que la position vaut : un relevé à 500 m près ne doit
+    // pas se lire comme un point posé sur le trottoir.
+    const radius = Number(myPos.accuracy) || 0;
+    if (me.current.halo) {
+      me.current.halo.setCenter(position);
+      me.current.halo.setRadius(radius);
+    } else {
+      me.current.halo = new maps.Circle({
+        map: map.current,
+        center: position,
+        radius,
+        strokeColor: ME_COLOR,
+        strokeOpacity: 0.35,
+        strokeWeight: 1,
+        fillColor: ME_COLOR,
+        fillOpacity: 0.12,
+        clickable: false,
+      });
+    }
+
+    // Seulement au premier relevé : recentrer à chaque affinage volerait la
+    // carte à qui vient de la déplacer.
+    if (!me.current.centered) {
+      me.current.centered = true;
+      map.current.setCenter(position);
+      map.current.setZoom(15);
+    }
+  }, [ready, myPos]);
+
   if (!hasMapsKey || error) {
     return (
       <div
@@ -151,10 +272,42 @@ export default function GoogleMapView({ pts, sel, onSel }) {
   }
 
   return (
-    <div
-      ref={holder}
-      className="w-full rounded-lg map-view"
-      style={{ height: 440, background: 'var(--paper)', border: '1px solid var(--line)' }}
-    />
+    <div className="relative">
+      <div
+        ref={holder}
+        className="w-full rounded-lg map-view"
+        style={{ height: 440, background: 'var(--paper)', border: '1px solid var(--line)' }}
+      />
+      <button
+        type="button"
+        onClick={toggleTracking}
+        aria-pressed={tracking}
+        title={tracking ? 'Arrêter la localisation' : 'Afficher ma position'}
+        className="absolute rounded-full flex items-center justify-center"
+        style={{
+          top: 10,
+          left: 10,
+          width: 44,
+          height: 44,
+          background: tracking ? ME_COLOR : 'var(--paper)',
+          color: tracking ? 'var(--paper)' : 'var(--ink)',
+          border: `1px solid ${tracking ? ME_COLOR : 'var(--line)'}`,
+          boxShadow: '0 1px 4px rgba(27,34,48,.3)',
+        }}
+      >
+        <span className="sr-only">{tracking ? 'Arrêter la localisation' : 'Afficher ma position'}</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <circle cx="12" cy="12" r="6" />
+          <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+        </svg>
+      </button>
+      {(geoError || (tracking && !myPos)) && (
+        <div className="text-[10px] mt-2 px-1" style={{ color: 'var(--ink-soft)' }} role="status">
+          {geoError || 'Recherche de votre position…'}
+        </div>
+      )}
+    </div>
   );
 }

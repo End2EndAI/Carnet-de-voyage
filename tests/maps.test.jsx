@@ -6,6 +6,7 @@ vi.mock('../src/lib/googleMaps.js', () => ({
   hasMapsKey: false,
   MAP_ID: 'DEMO_MAP_ID',
   loadGoogleMaps: vi.fn(() => Promise.reject(new Error('Clé Google Maps absente'))),
+  onMapsAuthFailure: vi.fn(() => () => {}),
   suggestPlaces: vi.fn(),
   resolvePlace: vi.fn(),
   newSessionToken: vi.fn(),

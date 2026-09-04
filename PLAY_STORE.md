@@ -100,12 +100,33 @@ celle de votre clé d'upload — et elle n'est connue qu'après le premier envoi
 - **Sécurité des données** : compte (adresse e-mail) et contenu utilisateur
   (carnets), transmis à Supabase, Vercel, OpenAI et Google Maps Platform ;
   chiffrés en transit ; suppression possible par l'utilisateur ; ni publicité,
-  ni mesure d'audience, ni revente.
+  ni mesure d'audience, ni revente. La position affichée sur la carte reste sur
+  l'appareil, le temps de l'affichage : elle n'est ni enregistrée ni transmise,
+  donc pas « collectée » au sens du formulaire.
 - **Contenu généré par IA** : l'app en produit. Le signalement se fait par le
   lien « Signaler » présent sur chaque fiche marquée *suggéré*.
 - **Ressources graphiques** : icône 512×512 (`android/store_icon.png`),
   image de bannière 1024×500, au moins deux captures d'écran de téléphone.
 - Classification du contenu, public cible, déclaration publicité (aucune).
+
+## La localisation dans l'application Android
+
+Le bouton « ma position » de la carte fonctionne sur le web. Dans la TWA, la
+page n'obtient la position que si l'application Android porte elle-même la
+permission : sans cela, Chrome refuse la demande et la carte affiche « Localisation
+refusée » — le reste de l'application n'en souffre pas. Pour l'activer, il faut
+la délégation de position de Bubblewrap, qui touche au projet Android généré :
+
+- `android/twa-manifest.json` : `"features": { "locationDelegation": { "enabled": true } }`,
+  puis `bubblewrap update` pour régénérer le projet ;
+- il en résulte la permission `ACCESS_FINE_LOCATION` dans le manifeste, la
+  dépendance `com.google.androidbrowserhelper:locationdelegation` et son
+  gestionnaire enregistré dans `DelegationService`.
+
+Ce changement demande une nouvelle version publiée **et** une déclaration de
+position dans le formulaire « Sécurité des données » du Play Console : traitée
+sur l'appareil, jamais envoyée. Tant qu'il n'est pas fait, la fonction est une
+fonction du site, pas de l'application Android.
 
 ## Ce que la TWA n'exige pas
 

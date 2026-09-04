@@ -24,3 +24,21 @@ les restrictions Google jusqu'à ce que la nouvelle URL ait été validée.
 - Avant ouverture au public, publiez les conditions, la politique de
   confidentialité (OpenAI, Google et Supabase reçoivent des données de voyage),
   ainsi qu'une procédure d'export et de suppression de compte.
+
+## Quand la carte affiche « Une erreur s'est produite »
+
+Ce panneau gris vient de Google, pas de l'application : la clé a été refusée
+pour la page qui la demande. La console du navigateur en donne le motif exact
+(`RefererNotAllowedMapError`, `ApiNotActivatedMapError`,
+`BillingNotEnabledMapError`, `InvalidKeyMapError`).
+
+Le cas le plus courant est la préversion : Vercel sert chaque branche sur son
+propre domaine (`…-git-<branche>-<compte>.vercel.app`), qu'une restriction
+limitée au domaine de production ne couvre pas. Ajoutez alors le motif
+`https://ai-simple-voyage-planner-*.vercel.app/*` aux référents autorisés de la
+clé (Google Cloud → APIs & Services → Credentials), en plus des URLs de
+production. La restriction reste indispensable : une clé Maps sans référent
+autorisé est utilisable par n'importe quel site, à vos frais.
+
+L'application intercepte ce refus (`gm_authFailure`) et remplace le panneau de
+Google par un message qui dit quoi vérifier ; elle ne peut pas le corriger.

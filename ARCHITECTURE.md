@@ -82,7 +82,11 @@ erreur est affichée, mais l'état local n'est pas automatiquement rechargé.
 utilise Places Autocomplete avec un délai de 320 ms et un jeton de session ;
 le résultat remplit nom, adresse et coordonnées. `GoogleMapView` ne monte la
 carte qu'en vue carte et dessine des `AdvancedMarkerElement` pour les idées
-géolocalisées.
+géolocalisées. Son bouton de localisation passe par `lib/geolocation.js`, qui
+enveloppe `navigator.geolocation.watchPosition` : la position est dessinée avec
+son cercle de précision, la carte n'est recentrée qu'au premier relevé, et le
+suivi s'arrête au clic suivant comme au démontage du composant. Cette position
+ne quitte pas le navigateur : elle n'est ni enregistrée ni envoyée à un tiers.
 
 Le formulaire d'idée appelle `POST /api/generate-idea`. La fonction effectue
 une recherche web OpenAI au mieux, puis produit un JSON strict ; le client ne
@@ -156,6 +160,9 @@ un nouveau déploiement.
   même temps ; un changement front seul n'est pas une règle de sécurité.
 - Changer Google Maps : garder le chargement centralisé dans `googleMaps.js`;
   ne chargez pas le SDK depuis un composant supplémentaire.
+- Toucher à la localisation : `lib/geolocation.js` et `GoogleMapView`. Si la
+  position venait à être enregistrée ou transmise, la politique de
+  confidentialité et la déclaration Play Console changeraient avec le code.
 - Changer les prompts ou modèles : uniquement dans `api/`, jamais dans une
   variable `VITE_*` ni dans le client.
 

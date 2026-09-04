@@ -8,6 +8,24 @@ export const hasMapsKey = Boolean(API_KEY);
 
 let loader = null;
 
+// Google ne rejette pas la promesse quand il refuse la clé : le script se
+// charge, puis la carte se remplace par un panneau d'erreur en gris. Le SDK
+// appelle `gm_authFailure` dans ce cas — de quoi afficher notre propre message,
+// dans la langue du carnet, plutôt que ce panneau.
+let authFailed = false;
+const authListeners = new Set();
+
+/**
+ * Prévient quand Google refuse la clé (restriction de domaine, API non
+ * activée, facturation désactivée). Retourne la fonction de désabonnement ;
+ * un refus déjà survenu est signalé immédiatement.
+ */
+export function onMapsAuthFailure(listener) {
+  authListeners.add(listener);
+  if (authFailed) listener();
+  return () => authListeners.delete(listener);
+}
+
 /** Charge le SDK Google Maps une seule fois pour toute l'application. */
 export function loadGoogleMaps() {
   if (loader) return loader;
@@ -26,6 +44,11 @@ export function loadGoogleMaps() {
     window[callbackName] = () => {
       delete window[callbackName];
       resolve(window.google.maps);
+    };
+
+    window.gm_authFailure = () => {
+      authFailed = true;
+      authListeners.forEach((listener) => listener());
     };
 
     const script = document.createElement('script');

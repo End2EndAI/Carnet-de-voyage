@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { loadGoogleMaps, hasMapsKey, MAP_ID } from '../lib/googleMaps.js';
+import { loadGoogleMaps, hasMapsKey, MAP_ID, onMapsAuthFailure } from '../lib/googleMaps.js';
 import { watchPosition } from '../lib/geolocation.js';
 
 // Une couleur par étape, tirée de la palette du carnet. L'identifiant de
@@ -77,8 +77,19 @@ export default function GoogleMapView({ pts, sel, onSel }) {
     loadGoogleMaps()
       .then(() => !cancelled && setReady(true))
       .catch((e) => !cancelled && setError(e.message));
+    // Clé refusée : Google remplace la carte par son panneau d'erreur en gris,
+    // qui ne dit pas quoi corriger. On prend la main sur l'explication.
+    const unsubscribe = onMapsAuthFailure(() => {
+      if (cancelled) return;
+      setError(
+        'Carte indisponible : Google a refusé la clé pour ce domaine. À vérifier dans '
+        + 'Google Cloud : les restrictions de la clé, l’activation de Maps JavaScript '
+        + 'API, et la facturation du projet.',
+      );
+    });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
@@ -170,6 +181,12 @@ export default function GoogleMapView({ pts, sel, onSel }) {
   // À la fermeture de la carte, la géolocalisation ne doit pas continuer à
   // tourner en fond : elle consomme la batterie pour rien.
   useEffect(() => stopTracking, [stopTracking]);
+
+  // Carte remplacée par un message d'erreur : le bouton d'arrêt disparaît avec
+  // elle, le suivi ne doit pas lui survivre.
+  useEffect(() => {
+    if (error) stopTracking();
+  }, [error, stopTracking]);
 
   const toggleTracking = () => {
     if (tracking) {

@@ -7,6 +7,7 @@ vi.mock('../src/lib/googleMaps.js', () => ({
   hasMapsKey: true,
   MAP_ID: 'DEMO_MAP_ID',
   loadGoogleMaps: vi.fn(() => Promise.resolve()),
+  onMapsAuthFailure: vi.fn(() => () => {}),
 }));
 import GoogleMapView from '../src/components/GoogleMapView.jsx';
 

@@ -160,9 +160,12 @@ un nouveau déploiement.
   même temps ; un changement front seul n'est pas une règle de sécurité.
 - Changer Google Maps : garder le chargement centralisé dans `googleMaps.js`;
   ne chargez pas le SDK depuis un composant supplémentaire.
-- Toucher à la localisation : `lib/geolocation.js` et `GoogleMapView`. Si la
-  position venait à être enregistrée ou transmise, la politique de
-  confidentialité et la déclaration Play Console changeraient avec le code.
+- Toucher à la localisation : `lib/geolocation.js` et `GoogleMapView`, plus
+  l'en-tête `Permissions-Policy` de `vercel.json` — un navigateur refuse la
+  position sans même la demander si l'en-tête ne l'autorise pas, et cela ne se
+  voit qu'en production. Si la position venait à être enregistrée ou transmise,
+  la politique de confidentialité et la déclaration Play Console changeraient
+  avec le code.
 - Changer les prompts ou modèles : uniquement dans `api/`, jamais dans une
   variable `VITE_*` ni dans le client.
 

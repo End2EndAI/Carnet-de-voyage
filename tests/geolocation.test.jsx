@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -151,5 +152,21 @@ describe('localisation sur la carte', () => {
 
     await user.click(button);
     expect(await screen.findByText(/Localisation indisponible/)).toBeInTheDocument();
+  });
+});
+
+// Le site interdit caméra et micro par en-tête ; la carte, elle, a besoin de la
+// position. Un `geolocation=()` vide refuse la permission à tout le monde, le
+// site compris : le navigateur répond « refusée » sans même demander, et la
+// fonction est morte en production alors que tout passe en local.
+describe('en-têtes du site', () => {
+  const headers = JSON.parse(fs.readFileSync('vercel.json', 'utf8')).headers
+    .find((rule) => rule.source === '/(.*)').headers;
+  const policy = headers.find((header) => header.key === 'Permissions-Policy').value;
+
+  it('lets the site itself use geolocation, and nobody else', () => {
+    expect(policy).toContain('geolocation=(self)');
+    expect(policy).toContain('camera=()');
+    expect(policy).toContain('microphone=()');
   });
 });

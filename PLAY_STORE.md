@@ -72,6 +72,17 @@ Attention si vous relancez `bubblewrap update` : il régénère le projet Androi
 depuis `twa-manifest.json` et écrase `strings.xml`. Revérifiez alors les trois
 lignes du tableau ci-dessus — `npm test` échoue si elles divergent.
 
+Il écrase aussi, silencieusement, deux choses que `npm test` ne voit pas. À
+revérifier après **chaque** `bubblewrap update` :
+
+- `android/app/build.gradle` : le bloc `signingConfigs` et les `appVersionCode` /
+  `appVersionName` surchargeables disparaissent. Sans eux, `assembleRelease`
+  produit un `app-release-unsigned.apk` au lieu de l'APK signé — l'échec est
+  discret, le build reste « SUCCESSFUL ».
+- `android/build.gradle` : les dépôts repassent de `mavenCentral()` à
+  `jcenter()`, fermé depuis 2021. La résolution des dépendances casse sur un
+  clone neuf, pas forcément sur une machine dont le cache Gradle est chaud.
+
 ## 3. Le point d'ordre à ne pas rater : l'empreinte
 
 Google **re-signe** votre AAB avec sa propre clé (Play App Signing).
@@ -111,22 +122,30 @@ celle de votre clé d'upload — et elle n'est connue qu'après le premier envoi
 
 ## La localisation dans l'application Android
 
-Le bouton « ma position » de la carte fonctionne sur le web. Dans la TWA, la
-page n'obtient la position que si l'application Android porte elle-même la
-permission : sans cela, Chrome refuse la demande et la carte affiche « Localisation
-refusée » — le reste de l'application n'en souffre pas. Pour l'activer, il faut
-la délégation de position de Bubblewrap, qui touche au projet Android généré :
+Le bouton « ma position » marche dans la TWA **sans rien ajouter** au projet
+Android : la TWA partage le profil de Chrome, donc sa permission système de
+position et la permission accordée à l'origine du site. C'est Chrome qui
+demande la position et qui affiche l'invite, exactement comme dans l'onglet.
 
-- `android/twa-manifest.json` : `"features": { "locationDelegation": { "enabled": true } }`,
-  puis `bubblewrap update` pour régénérer le projet ;
-- il en résulte la permission `ACCESS_FINE_LOCATION` dans le manifeste, la
-  dépendance `com.google.androidbrowserhelper:locationdelegation` et son
-  gestionnaire enregistré dans `DelegationService`.
+L'application ne porte donc **aucune permission de position** — rien à déclarer
+à ce titre dans le formulaire « Sécurité des données » du Play Console au-delà
+de ce que le site fait déjà (position affichée sur l'appareil, jamais envoyée).
 
-Ce changement demande une nouvelle version publiée **et** une déclaration de
-position dans le formulaire « Sécurité des données » du Play Console : traitée
-sur l'appareil, jamais envoyée. Tant qu'il n'est pas fait, la fonction est une
-fonction du site, pas de l'application Android.
+### N'activez pas la délégation de position
+
+La délégation de Bubblewrap (`"features": { "locationDelegation": … }`) a été
+essayée puis retirée : elle **casse** la fonction. Elle remplace la position de
+Chrome par un fournisseur côté application, et
+`LocationProviderGmsCore.onLocationAvailability()` se désabonne des mises à
+jour dès le premier `isLocationAvailable() == false` — ce qui arrive aussitôt
+sans point GPS. La page reçoit alors `POSITION_UNAVAILABLE` et la carte affiche
+« Position indisponible », y compris là où Chrome, lui, localise très bien.
+Symptômes observés : aucune invite de permission, et le même échec en haute
+comme en basse précision.
+
+Si la position échoue dans l'application alors qu'elle marche dans Chrome sur
+le même appareil, cherchez donc du côté de la délégation avant d'incriminer
+l'appareil ou les réglages.
 
 ## Ce que la TWA n'exige pas
 

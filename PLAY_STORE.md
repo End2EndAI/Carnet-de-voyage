@@ -21,6 +21,23 @@ Ces trois lignes forment la vérification *Digital Asset Links*. Si l'une ne
 correspond pas, l'app s'ouvre en Custom Tab **avec la barre d'adresse visible**
 — c'est le motif de rejet le plus courant pour une TWA.
 
+## 0. Les outils, une fois pour toutes
+
+Le projet Android est dans le dépôt : rien à générer, `bubblewrap` n'est pas
+nécessaire pour construire. Il faut en revanche, sur le poste de build :
+
+- un **JDK 17 ou plus** (`java -version`) — le plugin Android 8.9 l'exige.
+  `brew install --cask temurin@17`, ou le JDK fourni par Android Studio ;
+- le **SDK Android** avec la plateforme 36. Le plus simple est Android Studio ;
+  sinon `brew install --cask android-commandlinetools` puis
+  `sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"` ;
+- de dire à Gradle où il est, si `ANDROID_HOME` n'est pas déjà exporté :
+  `echo "sdk.dir=$HOME/Library/Android/sdk" > android/local.properties`
+  (gitignoré).
+
+Toutes les commandes de build se lancent **depuis `android/`** : c'est là
+qu'est `gradlew`, pas à la racine du dépôt.
+
 ## 1. La clé d'upload
 
 À faire une seule fois. **Perdre cette clé interdit définitivement toute mise à
@@ -42,7 +59,7 @@ cp android/keystore.properties.example android/keystore.properties
 valeurs se passent par `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`,
 `ANDROID_KEY_ALIAS` et `ANDROID_KEY_PASSWORD`.
 
-## 2. Construire l'AAB
+## 2. Construire l'AAB (ce qui s'envoie au Play Store)
 
 ```bash
 cd android && ./gradlew bundleRelease
@@ -58,6 +75,36 @@ défaut ; incrémentez-le à chaque publication, sans éditer le fichier :
 
 Les variables `CARNET_VERSION_CODE` et `CARNET_VERSION_NAME` font la même
 chose depuis l'environnement.
+
+### Un APK signé, pour essayer sur un téléphone
+
+Le Play Store n'accepte que l'AAB ; un APK sert à installer soi-même, sans
+passer par le magasin. Même clé, même configuration de signature :
+
+```bash
+cd android && ./gradlew assembleRelease
+# → app/build/outputs/apk/release/app-release.apk
+```
+
+Vérifier que la signature est bien celle attendue, puis installer :
+
+```bash
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs \
+  app/build/outputs/apk/release/app-release.apk
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+Sans `android/keystore.properties` (ni variables d'environnement), la
+configuration de signature reste vide et la tâche release échoue : c'est voulu,
+plutôt qu'un binaire signé avec la clé de debug. `./gradlew assembleDebug`
+reste disponible pour un essai rapide.
+
+Attention : un APK signé par la clé d'upload n'est pas celui que le Play Store
+distribuera. Le magasin resigne avec la clé de *Play App Signing*, dont
+l'empreinte est celle qui doit figurer dans
+`public/.well-known/assetlinks.json`. Un APK installé à la main peut donc
+afficher la barre d'adresse alors que la version du magasin ne l'affichera pas
+— sauf à ajouter aussi l'empreinte de la clé d'upload à `assetlinks.json`.
 
 ### Les icônes
 

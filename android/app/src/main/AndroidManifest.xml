@@ -23,8 +23,6 @@
     package="com.aivoyageplanner.app">
 
     
-        <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    
 
     
 
@@ -191,8 +189,6 @@
             </intent-filter>
         </service>
 
-        
-            <activity android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity" />
         
 
         

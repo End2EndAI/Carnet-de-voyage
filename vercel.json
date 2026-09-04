@@ -16,6 +16,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/confidentialite", "destination": "/confidentialite.html" },
+    { "source": "/conditions", "destination": "/conditions.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

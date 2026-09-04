@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#F2EDE3">
+    <title>Politique de confidentialité — Carnet de voyage</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <style>
+      :root { --bg:#F2EDE3; --paper:#FAF6EE; --ink:#1B2230; --ink-soft:#5A6070; --line:#D6CCB9; --vermillion:#B5483D; }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--bg); color:var(--ink);
+        font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+        padding: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right))
+                 max(2.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left)); }
+      main { max-width: 44rem; margin: 0 auto; }
+      h1 { font: italic 600 2rem/1.2 Georgia, serif; margin: 0 0 .25rem; }
+      h2 { font: 600 1.05rem/1.3 system-ui, sans-serif; margin: 2.25rem 0 .5rem;
+        letter-spacing: .01em; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+      .date { color: var(--ink-soft); font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; }
+      p, li { color: var(--ink); }
+      li { margin-bottom: .4rem; }
+      ul { padding-left: 1.2rem; }
+      a { color: var(--vermillion); }
+      table { width:100%; border-collapse: collapse; margin: .75rem 0; font-size: .9rem; display:block; overflow-x:auto; }
+      th, td { text-align: left; vertical-align: top; padding: .5rem .6rem; border-bottom: 1px solid var(--line); }
+      th { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+      .note { background: var(--paper); border-left: 2px solid var(--vermillion);
+        padding: .85rem 1rem; border-radius: 4px; margin: 1rem 0; }
+      footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--line);
+        font-size: .8rem; color: var(--ink-soft); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Politique de confidentialité</h1>
+      <p class="date">Carnet de voyage · dernière mise à jour : 3 septembre 2026</p>
+
+      <p>Carnet de voyage est une application personnelle de préparation de voyage. Cette
+      page décrit exactement quelles données sont collectées, pourquoi, et à qui elles sont
+      transmises. Elle vaut pour le site web et pour l’application Android, qui affiche le
+      même site.</p>
+
+      <div class="note">
+        <strong>L’essentiel :</strong> aucune publicité, aucun traceur analytique, aucune
+        revente de données. Les seules données traitées sont votre adresse e-mail et le
+        contenu que vous saisissez dans vos carnets. Vous pouvez tout supprimer vous-même,
+        à tout moment, depuis l’application.
+      </div>
+
+      <h2>Responsable du traitement</h2>
+      <p>Le service est édité et exploité par un particulier, joignable à l’adresse
+      <a href="mailto:louis.fontaine.pro@gmail.com">louis.fontaine.pro@gmail.com</a>.
+      C’est aussi l’adresse à utiliser pour toute question ou demande relative à vos données.</p>
+
+      <h2>Données collectées</h2>
+      <table>
+        <tr><th>Donnée</th><th>Pourquoi</th><th>Base légale</th></tr>
+        <tr>
+          <td><strong>Adresse e-mail</strong> et mot de passe</td>
+          <td>Créer et sécuriser votre compte, vous permettre de vous reconnecter et de
+          réinitialiser votre mot de passe. Le mot de passe n’est jamais stocké en clair :
+          seule une empreinte cryptographique est conservée.</td>
+          <td>Exécution du service</td>
+        </tr>
+        <tr>
+          <td><strong>Contenu de vos carnets</strong> : titre et dates du voyage, étapes,
+          réponses au questionnaire de création, et pour chaque lieu son nom, sa catégorie,
+          son descriptif, son quartier, vos notes et votre avis, votre verdict, le statut
+          favori, ses coordonnées et son identifiant Google Maps</td>
+          <td>C’est l’objet même de l’application : afficher vos carnets et les retrouver
+          d’un appareil à l’autre.</td>
+          <td>Exécution du service</td>
+        </tr>
+        <tr>
+          <td><strong>Adresse e-mail des personnes avec qui vous partagez un voyage</strong></td>
+          <td>Donner à ces comptes l’accès en lecture ou en écriture au voyage concerné.
+          Le partage n’est possible qu’avec une adresse déjà inscrite.</td>
+          <td>Exécution du service, à votre initiative</td>
+        </tr>
+        <tr>
+          <td><strong>Journaux techniques</strong> tenus par les hébergeurs (adresse IP,
+          horodatage, page demandée)</td>
+          <td>Sécurité, prévention des abus et diagnostic de panne.</td>
+          <td>Intérêt légitime</td>
+        </tr>
+      </table>
+
+      <p>Il n’y a <strong>ni cookie publicitaire, ni mesure d’audience, ni outil de suivi
+      comportemental</strong>. Le stockage local du navigateur sert uniquement à maintenir
+      votre session ouverte et à rouvrir le dernier carnet consulté.</p>
+
+      <h2>Ce qui est transmis à des tiers, et quoi exactement</h2>
+      <p>L’application s’appuie sur quatre prestataires techniques. Aucun d’eux ne reçoit
+      vos données à des fins publicitaires, et aucune donnée n’est vendue ni échangée.</p>
+      <table>
+        <tr><th>Prestataire</th><th>Rôle</th><th>Ce qu’il reçoit</th></tr>
+        <tr>
+          <td><strong>Supabase</strong></td>
+          <td>Authentification et base de données</td>
+          <td>Votre adresse e-mail, l’empreinte de votre mot de passe et l’intégralité du
+          contenu de vos carnets.</td>
+        </tr>
+        <tr>
+          <td><strong>Vercel</strong></td>
+          <td>Hébergement du site et des fonctions serveur</td>
+          <td>Les journaux techniques d’accès, et le contenu qui transite par les fonctions
+          de génération, sans le conserver.</td>
+        </tr>
+        <tr>
+          <td><strong>OpenAI</strong></td>
+          <td>Génération du carnet à la création d’un voyage, et complétion d’une fiche
+          de lieu</td>
+          <td>Uniquement ce qui est nécessaire à la demande : la destination, les dates,
+          les étapes, les centres d’intérêt, le rythme et les notes libres que vous avez
+          saisis dans le questionnaire ; ou le nom du lieu à compléter et sa localisation.
+          <strong>Ni votre adresse e-mail ni votre identifiant de compte ne sont
+          transmis.</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Google Maps Platform</strong></td>
+          <td>Carte, recherche d’adresse et photos des lieux</td>
+          <td>Les termes que vous tapez dans la recherche d’adresse et les coordonnées des
+          lieux affichés, depuis votre navigateur.</td>
+        </tr>
+      </table>
+      <p>Ces prestataires peuvent traiter les données en dehors de l’Union européenne,
+      notamment aux États-Unis, dans le cadre des garanties contractuelles qu’ils
+      proposent. Chacun applique sa propre politique de confidentialité.</p>
+
+      <h2>Contenu généré par intelligence artificielle</h2>
+      <p>Les suggestions de lieux et les brouillons de fiche sont produits automatiquement
+      et repérables dans l’application par la mention <em>suggéré</em>. Ils peuvent être
+      inexacts, incomplets ou inadaptés : vérifiez toujours une information avant de vous
+      en servir pour un voyage réel.</p>
+      <p>Chaque fiche suggérée porte un lien <strong>Signaler</strong> qui permet de nous
+      signaler un contenu offensant, trompeur ou inapproprié. Vous pouvez aussi écrire
+      directement à
+      <a href="mailto:louis.fontaine.pro@gmail.com?subject=Signalement%20de%20contenu%20g%C3%A9n%C3%A9r%C3%A9%20par%20IA">louis.fontaine.pro@gmail.com</a>.
+      Chaque signalement est examiné manuellement.</p>
+
+      <h2>Durée de conservation</h2>
+      <p>Vos données sont conservées tant que votre compte existe. Dès que vous supprimez
+      votre compte, le compte et tout son contenu — voyages, idées et partages — sont
+      effacés des bases de données. Les journaux techniques des hébergeurs sont conservés
+      quelques semaines selon leurs propres durées de rétention, puis effacés.</p>
+
+      <h2>Supprimer votre compte et vos données</h2>
+      <p>Depuis l’application : ouvrez la liste de vos voyages et choisissez
+      <strong>Supprimer mon compte</strong> en bas de l’écran. Sans installer
+      l’application, la même action est accessible sur
+      <a href="/?delete-account=1">carnet de voyage — supprimer mon compte</a> après
+      connexion.</p>
+      <p>La suppression est immédiate et irréversible. Elle emporte le compte, les voyages
+      dont vous êtes propriétaire, toutes leurs idées et tous les partages associés.</p>
+
+      <h2>Vos droits</h2>
+      <p>Conformément au RGPD, vous disposez d’un droit d’accès, de rectification,
+      d’effacement, de limitation, d’opposition et de portabilité sur vos données.
+      La rectification et l’effacement s’exercent directement dans l’application ; pour
+      tout le reste, écrivez à
+      <a href="mailto:louis.fontaine.pro@gmail.com">louis.fontaine.pro@gmail.com</a>, avec
+      une réponse sous un mois. Vous pouvez également introduire une réclamation auprès de
+      la CNIL (<a href="https://www.cnil.fr" target="_blank" rel="noopener noreferrer">cnil.fr</a>).</p>
+
+      <h2>Sécurité</h2>
+      <p>Les échanges sont chiffrés en HTTPS. L’accès aux données est cloisonné au niveau
+      de la base elle-même : les règles de sécurité de Supabase font qu’un compte ne peut
+      lire ni modifier les carnets d’un autre, même en manipulant les requêtes depuis le
+      navigateur. Un voyage n’est visible d’un autre compte que si vous l’avez
+      explicitement partagé avec lui.</p>
+
+      <h2>Mineurs</h2>
+      <p>Le service n’est pas destiné aux personnes de moins de 15 ans et ne collecte pas
+      sciemment leurs données. Si vous constatez qu’un compte a été créé par un mineur de
+      moins de 15 ans, signalez-le à l’adresse ci-dessus pour qu’il soit supprimé.</p>
+
+      <h2>Modifications</h2>
+      <p>Cette politique peut évoluer avec l’application. La date de dernière mise à jour,
+      en haut de page, indique la version en vigueur. Un changement substantiel sera
+      annoncé dans l’application.</p>
+
+      <footer>
+        <a href="/">Retour à l’application</a> · <a href="/conditions">Conditions d’utilisation</a>
+      </footer>
+    </main>
+  </body>
+</html>

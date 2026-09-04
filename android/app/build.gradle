@@ -33,7 +33,9 @@ def twaManifest = [
     navigationDividerColor: '#000000', // The navbar divider color.
     navigationDividerColorDark: '#000000', // The dark navbar divider color.
     backgroundColor: '#F2EDE3', // The color used for the splash screen background.
-    enableNotifications: true, // Set to true to enable notification delegation.
+    // Le site n'utilise ni Notification ni push : la délégation ne serait
+    // qu'une permission demandée pour rien.
+    enableNotifications: false,
     // Every shortcut must include the following fields:
     // - name: String that will show up in the shortcut.
     // - short_name: Shorter string used if |name| is too long.
@@ -50,6 +52,23 @@ def twaManifest = [
     orientation: 'default',
 ]
 
+def appVersionCode = (project.findProperty('carnetVersionCode')
+        ?: System.getenv('CARNET_VERSION_CODE') ?: '1') as Integer
+def appVersionName = project.findProperty('carnetVersionName')
+        ?: System.getenv('CARNET_VERSION_NAME') ?: '1.0.0'
+
+// Secrets de signature — jamais dans le dépôt. Renseignez android/keystore.properties
+// (gitignoré, voir keystore.properties.example) ou, en CI, les variables
+// d'environnement ANDROID_KEYSTORE_FILE / _PASSWORD / ANDROID_KEY_ALIAS / _PASSWORD.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def keystoreSetting = { String key, String envName ->
+    keystoreProperties.getProperty(key) ?: System.getenv(envName)
+}
+
 android {
     compileSdkVersion 36
     namespace "com.aivoyageplanner.app"
@@ -57,8 +76,11 @@ android {
         applicationId "com.aivoyageplanner.app"
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode 1
-        versionName "1"
+        // Un versionCode n'est acceptable qu'une fois par envoi au Play Store.
+        // Surchargeables sans éditer ce fichier :
+        //   ./gradlew bundleRelease -PcarnetVersionCode=2 -PcarnetVersionName=1.1.0
+        versionCode appVersionCode
+        versionName appVersionName
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -150,9 +172,23 @@ android {
 
         
     }
+    signingConfigs {
+        release {
+            def storePath = keystoreSetting('storeFile', 'ANDROID_KEYSTORE_FILE')
+            // Sans keystore configuré, la config reste vide : les tâches de debug
+            // continuent de fonctionner, seule la release refusera de se signer.
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword keystoreSetting('storePassword', 'ANDROID_KEYSTORE_PASSWORD')
+                keyAlias keystoreSetting('keyAlias', 'ANDROID_KEY_ALIAS')
+                keyPassword keystoreSetting('keyPassword', 'ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled true
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {

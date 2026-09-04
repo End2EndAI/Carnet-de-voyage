@@ -12,7 +12,8 @@ ses voyages, puis peut les partager avec les personnes de son choix.
 - **Création guidée** : cinq questions (destination, dates, étapes, centres
   d'intérêt, rythme) et le carnet se pré-remplit avec des lieux suggérés
 - **Ajouter / modifier / supprimer** des idées de visite
-- **Vraie carte Google Maps** avec un marqueur par lieu, cliquable
+- **Vraie carte Google Maps** avec un marqueur par lieu, cliquable, et un bouton
+  pour afficher et suivre votre position
 - **Recherche d'adresse** (Google Places) : le nom et les coordonnées se remplissent seuls
 - **Complétion d'une fiche par IA** à partir du seul nom du lieu
 - **Photo du lieu** (Google Places), affichée sur la fiche et dans le formulaire
